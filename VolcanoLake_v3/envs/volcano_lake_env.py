@@ -33,9 +33,14 @@ class VolcanoLakeEnv(gym.Env):
     # Opcional: metadata para el modo render
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, map_file_path):
+    def __init__(self, map_file_path=None):
         super().__init__()
 
+        # Mapa predeterminado
+        if map_file_path is None:
+            current_dir = os.path.dirname(__file__)
+            map_file_path = os.path.join(current_dir, '..', 'map_25x25.csv')            
+        
         # --- Carga del mapa ---
         if not os.path.exists(map_file_path):
             raise FileNotFoundError(f"No se pudo encontrar el archivo del mapa: {map_file_path}")
