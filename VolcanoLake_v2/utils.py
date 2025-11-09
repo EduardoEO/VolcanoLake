@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # -----------------------------
-# Funciones para visualización
+# Función para visualización
 # -----------------------------
 
 def plot_training(env, agent, plot_save=False, rolling_length=500):

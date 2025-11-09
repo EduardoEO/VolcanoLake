@@ -108,8 +108,8 @@ class VolcanoLakeEnv(gym.Env):
         """
         Convierte (fila, col) 2D a un estado único y entero, 1D.
         Ejemplo: Si tienes un mapa de 4x3 (4 filas, 3 columnas)
-        Posición (1, 2) → estado = 1 x 3 + 2 = 5
-        Posición (0, 0) → estado = 0 x 3 + 0 = 0
+        Posición (1, 2) -> estado = 1 x 3 + 2 = 5
+        Posición (0, 0) -> estado = 0 x 3 + 0 = 0
         """
         return row * self.ncols + col
 
@@ -117,8 +117,8 @@ class VolcanoLakeEnv(gym.Env):
         """
         Convierte un estado 1D a (fila, col).
         Ejemplo: Si tienes un mapa de 4x3 (4 filas, 3 columnas)
-        Estado 5 en mapa 4x3 → fila = 5 ÷ 3 = 1, columna = 5 % 3 = 2 → (1, 2)
-        Estado 0 en mapa 4x3 → fila = 0 ÷ 3 = 0, columna = 0 % 3 = 0 → (0, 0)
+        Estado 5 en mapa 4x3 -> fila = 5 ÷ 3 = 1, columna = 5 % 3 = 2 -> (1, 2)
+        Estado 0 en mapa 4x3 -> fila = 0 ÷ 3 = 0, columna = 0 % 3 = 0 -> (0, 0)
         """
         row = state // self.ncols
         col = state % self.ncols
@@ -195,7 +195,7 @@ class VolcanoLakeEnv(gym.Env):
         # 6. Calcular recompensa y estado 'done'
         new_tile = self.current_desc[new_row, new_col]
         
-        reward = 0
+        reward = -0.01 # Evitar que el agente aprenda a solo ir a por T en vez de llegar a G
         terminated = False # 'terminated' es para fines del episodio (G, L)
         truncated = False # 'truncated' es para límites de tiempo (no usado aquí)
         
@@ -208,7 +208,7 @@ class VolcanoLakeEnv(gym.Env):
         elif new_tile == 'W':
             reward = -1 # Penalización por caer en agua (además de resbalar)
         elif new_tile == 'T':
-            reward = 5
+            reward = 2
             # Consumir el tesoro para este episodio
             self.current_desc[new_row, new_col] = '.'
         
