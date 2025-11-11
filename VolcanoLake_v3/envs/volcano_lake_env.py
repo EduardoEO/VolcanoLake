@@ -11,7 +11,7 @@ class VolcanoLakeEnv(gym.Env):
     - G: Meta (+10, termina)
     - L: Lava (-10, termina)
     - W: Agua (-1, resbala)
-    - T: Tesoro (+5, continúa, se consume)
+    - T: Tesoro (+2, continúa, se consume)
     - .: Tierra (0)
     
     Acciones (8):
