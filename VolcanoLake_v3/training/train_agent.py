@@ -1,8 +1,13 @@
 import gymnasium as gym
 from tqdm import tqdm
+import os
 
 from envs.volcano_lake_env import VolcanoLakeEnv
 from agent.qlearning_agent import VolcanoLakeAgent          
+
+# Obtener directorio del proyecto (VolcanoLake_v3)
+current_dir = os.path.dirname(os.path.abspath(__file__)) # training/
+project_root = os.path.dirname(current_dir) # VolcanoLake_v3/
 
 # Registro del entorno personalizado en gymnasium
 gym.register(
@@ -26,10 +31,18 @@ def train_volcanoLake_agent(n_episodes, map_path, learning_rate, start_epsilon, 
     Returns:
         tuple: (entorno, agente) entrenados
     """
+    # Crear carpeta de videos dentro de VolcanoLake_v3
+    videos_dir = os.path.join(project_root, "videos")
+    os.makedirs(videos_dir, exist_ok=True)
     
-    env = VolcanoLakeEnv(map_file_path=map_path)
-    
+    env = VolcanoLakeEnv(map_file_path=map_path, render_mode="rgb_array")
+        
     # ---- Wrappers ----
+    env = gym.wrappers.RecordVideo(
+        env, 
+        video_folder = videos_dir,
+        episode_trigger = lambda ep: ep == n_episodes - 1
+    )
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=n_episodes)
 
 

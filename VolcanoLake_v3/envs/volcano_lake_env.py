@@ -1,6 +1,7 @@
 import gymnasium as gym
 import numpy as np
 import os
+import pygame
 
 class VolcanoLakeEnv(gym.Env):
     """
@@ -33,7 +34,7 @@ class VolcanoLakeEnv(gym.Env):
     # Opcional: metadata para el modo render
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, map_file_path=None):
+    def __init__(self, map_file_path=None, render_mode=None):
         super().__init__()
 
         # Mapa predeterminado
@@ -102,6 +103,33 @@ class VolcanoLakeEnv(gym.Env):
         
         # El estado actual del agente (se reiniciará en reset())
         self.agent_state = self.start_state
+        
+        # --- Configuración del renderizado ---
+        self.render_mode = render_mode # Almacenamos el modo
+        self.window = None # Ventana de Pygame (se crea en render())
+        self.clock = None # Reloj de Pygame
+        
+        # Tamaño de cada celda en píxeles
+        if self.nrows > 50 or self.ncols > 50:
+            self.cell_size = 16 
+        elif self.nrows > 20 or self.ncols > 20:
+            self.cell_size = 32
+        else:
+            self.cell_size = 64
+            
+        self.window_width = self.ncols * self.cell_size
+        self.window_height = self.nrows * self.cell_size
+        
+        # Definición de colores RGB
+        self.colors = {
+            'S': (60, 179, 113), # Verde (Inicio)
+            'G': (255, 215, 0), # Dorado (Meta)
+            'L': (220, 20, 60), # Rojo (Lava)
+            'W': (30, 144, 255), # Azul (Agua)
+            'T': (148, 0, 211), # Violeta (Tesoro)
+            '.': (205, 133, 63), # Marrón (Tierra)
+            'AGENT': (220, 220, 220) # Gris claro (Agente)
+        }
 
 
     def _pos_to_state(self, row, col):
@@ -220,21 +248,101 @@ class VolcanoLakeEnv(gym.Env):
 
     def render(self):
         """
-        (Futuro) Aquí iría la lógica de Pygame.
-        Por ahora, podemos imprimir el mapa.
+        Renderiza el entorno VolcanoLake usando Pygame.
+    
+        Comportamiento según el modo de renderizado:
+        - "human": Muestra la ventana gráfica en pantalla para visualización interactiva
+        - "rgb_array": Devuelve un array NumPy con los píxeles para grabación de video
+        - None: No renderiza nada (modo silencioso)
+    
+        El renderizado incluye:
+        - Todas las casillas del mapa con sus colores correspondientes
+        - El agente representado como un rectángulo gris claro
+    
+        Returns:
+        numpy.ndarray or None: Array de píxeles (alto, ancho, 3) si mode="rgb_array", 
+                              None en caso contrario
         """
-        # Creamos una copia para mostrar al agente
-        render_desc = np.copy(self.current_desc)
+        if self.render_mode is None:
+            return
+        
+        if self.window is None:
+            # Solo se inicializa si se llama a render() por primera vez
+            pygame.init()
+            pygame.display.set_caption("VolcanoLake_v3")
+            
+            if self.render_mode == "human":
+                # Creamos una ventana visible
+                self.window = pygame.display.set_mode((self.window_width, self.window_height))
+            elif self.render_mode == "rgb_array":
+                # Creamos una superficie oculta 
+                self.window = pygame.Surface((self.window_width, self.window_height))
+            
+        if self.clock is None:
+            self.clock = pygame.time.Clock()
+            
+        # --- Lógica de dibujado ---
+        
+        # Creamos un lienzo (Canvas) para dibujar
+        canvas = pygame.Surface((self.window_width, self.window_height))
+        canvas.fill((255, 255, 255)) # Fondo blanco por si acaso
+
+        # Dibujamos todas las casillas del mapa
+        for r in range(self.nrows):
+            for c in range(self.ncols):
+                tile_type = self.current_desc[r, c]
+                color = self.colors.get(tile_type, (0, 0, 0)) # Negro si hay error
+                
+                pygame.draw.rect(
+                    canvas,
+                    color,
+                    (c * self.cell_size, r * self.cell_size, self.cell_size, self.cell_size)
+                )
+
+        # Dibujamos al agente encima
         agent_row, agent_col = self._state_to_pos(self.agent_state)
+        pygame.draw.rect(
+            canvas,
+            self.colors['AGENT'],
+            (agent_col * self.cell_size, agent_row * self.cell_size, self.cell_size, self.cell_size)
+        )
+
+        # --- Lógica de salida ---
         
-        # Marcamos al agente con 'A'
-        # (Podríamos usar colores ANSI si quisiéramos)
-        render_desc[agent_row, agent_col] = 'A'
-        
-        print("\n")
-        for row in render_desc:
-            print(" ".join(row))
+        if self.render_mode == "human":
+            # Si es modo "human", copiamos el lienzo a la ventana
+            self.window.blit(canvas, (0, 0))
+            pygame.event.pump()
+            pygame.display.update()
+            
+            # Controlamos los FPS
+            self.clock.tick(self.metadata["render_fps"])
+            
+        elif self.render_mode == "rgb_array":
+            # Si es "rgb_array", copiamos el lienzo a la superficie oculta
+            self.window.blit(canvas, (0, 0))
+            
+            # Devolvemos el contenido como un array NumPy
+            # Transponemos de (ancho, alto, 3) a (alto, ancho, 3)
+            return np.transpose(
+                pygame.surfarray.array3d(self.window), (1, 0, 2)
+            )
+            
 
     def close(self):
-        """(Futuro) Limpieza de recursos de Pygame."""
-        pass
+        """
+        Limpia y cierra todos los recursos de Pygame.
+    
+        Es importante llamar a esta función al final del entrenamiento o uso
+        para liberar memoria y evitar problemas con múltiples inicializaciones.
+    
+        Acciones realizadas:
+        - Cierra la ventana de pygame (si existe)
+        - Cierra pygame completamente
+        - Resetea las variables de ventana y reloj a None
+        """
+        if self.window is not None:
+            pygame.display.quit()
+            pygame.quit()
+            self.window = None # Importante para reiniciar
+            self.clock = None
