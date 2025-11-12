@@ -12,7 +12,7 @@ class VolcanoLakeEnv(gym.Env):
     - G: Meta (+10, termina)
     - L: Lava (-10, termina)
     - W: Agua (-1, resbala)
-    - T: Tesoro (+2, continúa, se consume)
+    - T: Tesoro (+5, continúa, se consume)
     - .: Tierra (0)
     
     Acciones (8):
@@ -236,7 +236,7 @@ class VolcanoLakeEnv(gym.Env):
         elif new_tile == 'W':
             reward = -1 # Penalización por caer en agua (además de resbalar)
         elif new_tile == 'T':
-            reward = 2
+            reward = 5
             # Consumir el tesoro para este episodio
             self.current_desc[new_row, new_col] = '.'
         
