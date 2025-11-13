@@ -1,14 +1,17 @@
 import numpy as np
+import warnings
 
 from training.train_agent import train_volcanoLake_agent
 from utils.plotting import plot_training
+
+warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium.wrappers.rendering")
 
 if __name__ == "__main__":
     
     # ==================== CONFIGURACIÓN DE PARÁMETROS ====================
 
     # Parametros del entrenamiento
-    N_EPISODES = 500_000
+    N_EPISODES = 100_000
     MAP_FILE = "VolcanoLake_v3/maps/map_5x5.csv"
     
     #Parámetros del algoritmo Q-Learning
