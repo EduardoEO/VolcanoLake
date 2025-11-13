@@ -78,3 +78,86 @@ class IncreasingLavaHoles(Wrapper):
             
             # 2. Guardamos el hoyo en nuestro 'set' permanente
             self.dynamic_holes.add((i, j))
+            
+class LimitedVision(Wrapper):
+    """
+    El agente tiene una dirección (0-7).
+    
+    - La acción que toma se convierte en su nueva dirección.
+    - Aplica una pequeña penalización de reward shaping si la casilla en la dirección que mira es peligrosa ('L' o 'W').
+    - Añade la visión a info["vision"].
+    """
+    
+    def __init__(self, env, vision_penalty=-0.1):
+        super().__init__(env)
+        
+        # Comprobamos que el entorno tiene action_to_delta
+        if not hasattr(self.env.unwrapped, "action_to_delta"):
+            raise TypeError("Este wrapper solo funciona con un entorno que tenga 'action_to_delta', como VolcanoLakeEnv.")
+            
+        # 0-7, coincide con las acciones del env
+        self.direction = 1  # Empezamos mirando a la derecha
+        self.penalty = vision_penalty
+
+    def reset(self, **kwargs):
+        """ Resetea el entorno y la dirección del agente. """
+        obs, info = self.env.reset(**kwargs)
+        
+        # Resetea la dirección
+        self.direction = 1  # Mirando a la derecha
+        
+        # Añade la visión inicial al 'info'
+        info["vision"] = self._get_vision_in_front(obs)
+        
+        return obs, info
+
+    def step(self, action):
+        """
+        Ejecuta el paso, aplica el reward shaping y actualiza la dirección.
+        """
+        # El entorno base calcula el resultado del paso
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        
+        # Obtenemos la visión (casilla actual, casilla enfrente) en la dirección que *teníamos*
+        vision_tiles = self._get_vision_in_front(obs)
+        info["vision"] = vision_tiles
+        
+        front_tile = vision_tiles[1] # 'L', 'W', 'G', 'T', '.', 'S'
+
+        # Aplicamos el reward shaping (Solo si el episodio no ha terminado por otra razón)
+        if not terminated:
+            if front_tile == 'L' or front_tile == 'W':
+                reward += self.penalty # Añade penalización (-0.1)
+                
+        # ACTUALIZAMOS la dirección del agente. La nueva dirección es la acción que acabamos de tomar
+        self.direction = action
+        
+        return obs, reward, terminated, truncated, info
+
+    def _get_vision_in_front(self, obs):
+        """
+        Devuelve (casilla_actual, casilla_enfrente) basándose
+        en la 'self.direction' actual del agente.
+        """
+        desc = self.env.unwrapped.current_desc
+        nrows, ncols = desc.shape
+        
+        # Posición actual del agente
+        current_row, current_col = self.env.unwrapped._state_to_pos(obs)
+        current_tile = desc[current_row, current_col]
+
+        # Obtener el delta de la dirección en la que miramos. Usamos el mapeo de acciones del entorno base
+        (dr, dc) = self.env.unwrapped.action_to_delta[self.direction]
+        
+        # Calcular la posición de la casilla de enfrente
+        front_row = current_row + dr
+        front_col = current_col + dc
+
+        # Comprobar límites
+        if not (0 <= front_row < nrows and 0 <= front_col < ncols):
+            front_tile = 'L' # Ver "fuera del mapa" es como ver Lava
+        else:
+            front_tile = desc[front_row, front_col]
+            
+        # Devolvemos las letras de las casillas (ej. '.', 'L')
+        return (current_tile, front_tile)
