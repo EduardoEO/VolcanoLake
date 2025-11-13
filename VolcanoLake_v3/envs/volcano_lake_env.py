@@ -104,6 +104,10 @@ class VolcanoLakeEnv(gym.Env):
         # El estado actual del agente (se reiniciará en reset())
         self.agent_state = self.start_state
         
+        # --- Tracking de estadísticas ---
+        self.treasures_found_queue = [] # Historial de tesoros por episodio
+        self.current_episode_treasures = 0 # Contador del episodio actual
+    
         # --- Configuración del renderizado ---
         self.render_mode = render_mode # Almacenamos el modo
         self.window = None # Ventana de Pygame (se crea en render())
@@ -159,11 +163,18 @@ class VolcanoLakeEnv(gym.Env):
         - Restaura todos los tesoros 'T' consumidos.
         """
         super().reset(seed=seed)
+        
+        # 1. Guardar tesoros del episodio anterior (si no es el primer reset)
+        if hasattr(self, 'current_episode_treasures'):
+            self.treasures_found_queue.append(self.current_episode_treasures)
+        
+        # 2. Resetear contador de tesoros para nuevo episodio
+        self.current_episode_treasures = 0
 
-        # 1. Resetear la posición del agente
+        # 3. Resetear la posición del agente
         self.agent_state = self.start_state
         
-        # 2. Resetear el mapa (restaurar tesoros)
+        # 4. Resetear el mapa (restaurar tesoros)
         self.current_desc = np.copy(self.base_desc)
         
         # Info estándar de Gymnasium
@@ -173,6 +184,7 @@ class VolcanoLakeEnv(gym.Env):
 
     def step(self, action):
         """Ejecuta un paso en el entorno."""
+        info = {}
         
         # 1. Obtener posición y tipo de casilla actual
         current_row, current_col = self._state_to_pos(self.agent_state)
@@ -239,10 +251,9 @@ class VolcanoLakeEnv(gym.Env):
             reward = 5
             # Consumir el tesoro para este episodio
             self.current_desc[new_row, new_col] = '.'
-        
+            self.current_episode_treasures += 1 # Incrementar el contador
+            info['treasures_found'] = 1.0
         # Casillas '.', 'S' no dan recompensa (reward = 0)
-
-        info = {}
         
         return self.agent_state, reward, terminated, truncated, info
 
