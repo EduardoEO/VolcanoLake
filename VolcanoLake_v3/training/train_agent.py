@@ -3,7 +3,8 @@ from tqdm import tqdm
 import os
 
 from envs.volcano_lake_env import VolcanoLakeEnv
-from agent.qlearning_agent import VolcanoLakeAgent          
+from agent.qlearning_agent import VolcanoLakeAgent    
+from wrappers.wrappers import IncreasingLavaHoles      
 
 # Obtener directorio del proyecto (VolcanoLake_v3)
 current_dir = os.path.dirname(os.path.abspath(__file__)) # training/
@@ -38,6 +39,7 @@ def train_volcanoLake_agent(n_episodes, map_path, learning_rate, start_epsilon, 
     env = VolcanoLakeEnv(map_file_path=map_path, render_mode="rgb_array")
         
     # ---- Wrappers ----
+    env = IncreasingLavaHoles(env, 5, 0.05)
     env = gym.wrappers.TimeLimit(env, 20)
     env = gym.wrappers.RecordVideo(
         env, 
