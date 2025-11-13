@@ -7,6 +7,25 @@ import os
 # -----------------------------
 
 def plot_training(env, agent, plot_save=False, rolling_length=500):
+    """
+    Genera gráficos de métricas del entrenamiento del agente Q-Learning.
+    
+    Crea un conjunto de 5 visualizaciones distribuidas en layout 2x3:
+    - Recompensas acumuladas por episodio (suavizadas)
+    - Duración de episodios (pasos por episodio)  
+    - Error de entrenamiento TD (Temporal Difference)
+    - Tasa de éxito (porcentaje de episodios que alcanzan la meta)
+    - Tesoros recogidos por episodio (si están disponibles)
+    
+    Args:
+        env: Entorno de entrenamiento (con wrappers RecordEpisodeStatistics)
+        agent: Agente Q-Learning entrenado con historial de errores
+        plot_save (bool): Si True, guarda las gráficas en carpeta plots/
+        rolling_length (int): Ventana para suavizado de curvas (media móvil)
+    
+    Returns:
+        None: Muestra o guarda las gráficas según plot_save
+    """
     fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(18, 8))
     fig.suptitle("Entrenamiento del agente volcanoLake", fontsize=16)
 
@@ -72,3 +91,34 @@ def plot_training(env, agent, plot_save=False, rolling_length=500):
         plt.savefig(save_path)
     else:
         plt.show()
+            
+def plot_value_heatmap(env, agent, plot_dir="plots"):
+    """
+    Genera y guarda un heatmap del valor de la Q-Table del agente entrenado.
+    
+    Visualiza los valores máximos de cada estado (max Q-value) como un mapa de calor
+    sobre la grilla del entorno, permitiendo identificar qué estados son más valiosos
+    para el agente después del entrenamiento.
+    
+    Args:
+        env: Entorno VolcanoLake (con acceso a dimensiones del mapa)
+        agent: Agente Q-Learning entrenado (con Q-table completa)
+        plot_dir (str): Directorio donde guardar el archivo PNG del heatmap
+    
+    Returns:
+        None: Guarda el heatmap como archivo PNG
+    """
+    print("Generando heatmap de la Q-Table...")
+    os.makedirs(plot_dir, exist_ok=True)
+
+    best_values = np.max(agent.q_values, axis=1)
+    value_heatmap = best_values.reshape((env.unwrapped.nrows, env.unwrapped.ncols))
+
+    plt.figure(figsize=(10, 10))
+    plt.imshow(value_heatmap, cmap='viridis', interpolation='nearest')
+    plt.colorbar(label='Valor del Estado (V(s))')
+    plt.title(f"Heatmap de Valores (Q-Table) - Mapa {env.unwrapped.nrows}x{env.unwrapped.ncols}")
+
+    heatmap_path = os.path.join(plot_dir, "volcanolake_value_heatmap.png")
+    plt.savefig(heatmap_path)
+    plt.close()

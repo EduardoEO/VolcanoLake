@@ -2,7 +2,7 @@ import numpy as np
 import warnings
 
 from training.train_agent import train_volcanoLake_agent
-from utils.plotting import plot_training
+from utils.plotting import plot_training, plot_value_heatmap
 
 warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium.wrappers.rendering")
 
@@ -37,6 +37,7 @@ if __name__ == "__main__":
     # Generar y guardar gráficos
     plot_save = True 
     plot_training(env, agent, plot_save)
+    plot_value_heatmap(env, agent, plot_dir="VolcanoLake_v3/plots")
     
     # Mostrar una muestra de la Q-table final con 2 decimales y sin notación científica
     np.set_printoptions(precision=2, suppress=True)
