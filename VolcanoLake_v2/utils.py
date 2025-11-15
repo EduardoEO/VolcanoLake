@@ -6,6 +6,27 @@ import matplotlib.pyplot as plt
 # -----------------------------
 
 def plot_training(env, agent, plot_save=False, rolling_length=500):
+    """
+    Genera gráficos de métricas del entrenamiento del agente Q-Learning.
+    
+    Crea un conjunto de 3 visualizaciones distribuidas en layout 1x3:
+    - Recompensas acumuladas por episodio (suavizadas con media móvil)
+    - Duración de episodios (número de pasos por episodio)  
+    - Error de entrenamiento TD (Temporal Difference Error)
+    
+    Args:
+        env: Entorno de entrenamiento (con wrapper RecordEpisodeStatistics)
+             Debe tener atributos return_queue y length_queue con historial
+        agent: Agente Q-Learning entrenado con historial de errores
+               Debe tener atributo training_error con lista de errores TD
+        plot_save (bool): Si True, guarda las gráficas en carpeta plots/
+                         Si False, muestra las gráficas en pantalla
+        rolling_length (int): Ventana para suavizado de curvas (media móvil)
+                             Valor por defecto: 500 episodios
+    
+    Returns:
+        None: Muestra o guarda las gráficas según parámetro plot_save
+    """
     fig, axs = plt.subplots(ncols=3, figsize=(15, 5))
     fig.suptitle("Entrenamiento del agente volcanoLake", fontsize=16)
 
