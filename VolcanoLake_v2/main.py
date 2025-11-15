@@ -1,9 +1,15 @@
 import gymnasium as gym
 import numpy as np
 from tqdm import tqdm
+import os
+import warnings
+
 from utils import plot_training
 from agent import VolcanoLakeAgent
 from wrappers import IncreasingHoles, LimitedVisionRewardShaping, LimitedVision
+
+warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium.wrappers.rendering")
+
 
 def train_volcanoLake_agent(n_episodes):
     """
@@ -31,11 +37,16 @@ def train_volcanoLake_agent(n_episodes):
     #env = LimitedVisionRewardShaping(env) # Verá solo la casilla de la derecha
     env = LimitedVision(env) # Verá la casilla de enfrente según la acción anterior
     env = gym.wrappers.TimeLimit(env, 20)
+    
+    # Crear carpeta videos en el directorio del script
+    video_folder = os.path.join(os.path.dirname(__file__), "videos")
+    os.makedirs(video_folder, exist_ok=True)
     env = gym.wrappers.RecordVideo(
         env, 
-        video_folder = "videos/",
+        video_folder = video_folder,
         episode_trigger = lambda ep: ep == n_episodes - 1
     )
+    
     # Registro de estadísticas (DEBE IR AL FINAL)
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=n_episodes)
 
@@ -59,7 +70,7 @@ def train_volcanoLake_agent(n_episodes):
         # Reinicio del entrono después de cada episodio
         obs, info = env.reset()
         done = False
-        # Un bucle del while equivale a un episodio
+        # Cada iteración equivale un paso del agente
         while not done:
             action = agent.get_action(env, obs) # Elige la acción según la política definida (epsilon-greedy)
             next_obs, reward, terminated, truncated, info = env.step(action) # Ejecuta la acción "rellenando" las variables
@@ -70,14 +81,14 @@ def train_volcanoLake_agent(n_episodes):
 
     return env, agent
 
-# -----------------------------
-# Bloque principal de ejecución
-# -----------------------------
+# ========================================
+# BLOQUE PRINCIPAL DE EJECUCIÓN
+# ========================================
 
 if __name__ == "__main__":
     # ===== CONFIGURACIÓN DE EJECUCIÓN =====
     plot_save = True
-    n_episodes = 500_000
+    n_episodes = 100_000
     
     # ===== ENTRENAMIENTO DEL AGENTE =====
     env, agent = train_volcanoLake_agent(n_episodes)

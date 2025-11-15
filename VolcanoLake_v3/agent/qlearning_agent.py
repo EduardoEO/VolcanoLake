@@ -41,7 +41,7 @@ class VolcanoLakeAgent:
         """
         Actualiza Q-table usando Q-Learning.
         
-        Q(s,a) <- Q(s,a) + alpha[r + gamma·max Q(s',a') - Q(s,a)]
+        Q(s,a) <- Q(s,a) + alpha[r + gamma*max Q(s',a') - Q(s,a)]
         """
         # Si el episodio terminó, no hay futuro por lo que será 0 y si no terminó será 1. Por lo tanto: 1. Si no terminó, future_q_value = max_a' Q(s', a') | 2. Si terminó, future_q_value = 0
         future_q_value = (not terminated) * np.max(self.q_values[next_obs])

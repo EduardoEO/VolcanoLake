@@ -5,8 +5,9 @@ import pygame
 
 class VolcanoLakeEnv(gym.Env):
     """
-    Entorno personalizado VolcanoLake v3.
-
+    Entorno personalizado VolcanoLake_v3.
+    
+    Aclaraciones iniciales:
     Reglas:
     - S: Inicio
     - G: Meta (+10, termina)
@@ -35,6 +36,17 @@ class VolcanoLakeEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     def __init__(self, map_file_path=None, render_mode=None):
+        """
+        Inicializa el entorno VolcanoLake v3.
+        
+        Args:
+            map_file_path (str, optional): Ruta al archivo CSV del mapa. 
+                                          Si es None, usa el mapa por defecto (map_25x25.csv).
+            render_mode (str, optional): Modo de renderizado ('human', 'rgb_array', o None).
+                                        - 'human': Muestra ventana gráfica en pantalla
+                                        - 'rgb_array': Devuelve arrays para grabación de video
+                                        - None: No renderiza
+        """
         super().__init__()
 
         # Mapa predeterminado
@@ -163,9 +175,27 @@ class VolcanoLakeEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         """
-        Reinicia el entorno al estado inicial.
-        - Resetea la posición del agente a 'S'.
-        - Restaura todos los tesoros 'T' consumidos.
+        Reinicia el entorno al estado inicial para comenzar un nuevo episodio.
+        
+        Esta función realiza las siguientes tareas:
+        1. Guarda las estadísticas del episodio anterior (tesoros y éxito)
+        2. Resetea contadores para el nuevo episodio
+        3. Restaura la posición del agente al punto de inicio 'S'
+        4. Restaura todos los tesoros 'T' consumidos durante el episodio anterior
+        
+        Args:
+            seed (int, optional): Semilla para el generador de números aleatorios.
+                                 Útil para reproducibilidad en experimentos.
+            options (dict, optional): Opciones adicionales (reservado para extensiones).
+        
+        Returns:
+            tuple: (observation, info)
+                - observation (int): Estado inicial del agente (posición de 'S')
+                - info (dict): Diccionario vacío con información adicional
+        
+        Note:
+            La primera vez que se llama (desde __init__), NO guarda estadísticas
+            porque aún no ha terminado ningún episodio.
         """
         super().reset(seed=seed)
         
@@ -196,7 +226,41 @@ class VolcanoLakeEnv(gym.Env):
         return self.agent_state, info
 
     def step(self, action):
-        """Ejecuta un paso en el entorno."""
+        """
+        Ejecuta una acción en el entorno y devuelve el resultado.
+        
+        Este es el núcleo del entorno. Procesa la acción del agente siguiendo estos pasos:
+        1. Determina si hay deslizamiento según el tipo de casilla actual
+        2. Calcula el movimiento resultante (puede ser diferente si resbala)
+        3. Actualiza la posición del agente (con clipping en bordes)
+        4. Calcula recompensas según la nueva casilla
+        5. Determina si el episodio terminó
+        
+        Args:
+            action (int): Acción a ejecutar (0-7)
+                         0: Arriba, 1: Derecha, 2: Abajo, 3: Izquierda
+                         4: Arriba-Derecha, 5: Abajo-Derecha
+                         6: Abajo-Izquierda, 7: Arriba-Izquierda
+        
+        Returns:
+            tuple: (observation, reward, terminated, truncated, info)
+                - observation (int): Nuevo estado del agente
+                - reward (float): Recompensa obtenida en este paso
+                - terminated (bool): True si el episodio terminó (G o L alcanzado)
+                - truncated (bool): True si se alcanzó límite de tiempo (no usado aquí)
+                - info (dict): Información adicional (vacío por ahora)
+        
+        Mecánicas de deslizamiento en Agua ('W'):
+        - Acciones cardinales (0-3): 80% éxito, 10% resbala 90° izq, 10% resbala 90° der
+        - Acciones diagonales (4-7): 80% éxito, 10% componente vertical, 10% componente horizontal
+        
+        Sistema de recompensas:
+        - Meta 'G': +10 (termina episodio exitoso)
+        - Lava 'L': -10 (termina episodio fallido)
+        - Tesoro 'T': +5 (se consume y desaparece)
+        - Agua 'W': -1 (penalización por mojarse)
+        - Tierra '.' / Inicio 'S': -0.001 (pequeño costo para fomentar eficiencia)
+        """
         info = {}
         
         # 1. Obtener posición y tipo de casilla actual
@@ -248,7 +312,7 @@ class VolcanoLakeEnv(gym.Env):
         # 6. Calcular recompensa y estado 'done'
         new_tile = self.current_desc[new_row, new_col]
         
-        reward = -0.01 # Evitar que el agente aprenda a solo ir a por T en vez de llegar a G
+        reward = -0.001 # Evitar que el agente aprenda a solo ir a por T en vez de llegar a G
         terminated = False # 'terminated' es para fines del episodio (G, L)
         truncated = False # 'truncated' es para límites de tiempo (no usado aquí)
         
@@ -361,9 +425,12 @@ class VolcanoLakeEnv(gym.Env):
         para liberar memoria y evitar problemas con múltiples inicializaciones.
     
         Acciones realizadas:
-        - Cierra la ventana de pygame (si existe)
-        - Cierra pygame completamente
+        - Cierra la ventana de Pygame (si existe)
+        - Cierra Pygame completamente
         - Resetea las variables de ventana y reloj a None
+        
+        Nota: Si no se llama, pueden quedar ventanas abiertas en segundo plano
+        consumiendo memoria y causando warnings en reinicios posteriores.
         """
         if self.window is not None:
             pygame.display.quit()

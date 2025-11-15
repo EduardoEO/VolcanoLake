@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 # -----------------------------
 # Función para visualización
@@ -49,7 +50,11 @@ def plot_training(env, agent, plot_save=False, rolling_length=500):
     axs[2].set_title("Error de entrenamiento (TD)")
 
     plt.tight_layout()
+    
     if plot_save:
-        plt.savefig("plots/volcanolake_training_metrics.png")
+        # Crear carpeta plots en el directorio del script
+        plots_folder = os.path.join(os.path.dirname(__file__), "plots")
+        os.makedirs(plots_folder, exist_ok=True)
+        plt.savefig(os.path.join(plots_folder, "volcanolake_training_metrics.png"))
     else:
         plt.show()

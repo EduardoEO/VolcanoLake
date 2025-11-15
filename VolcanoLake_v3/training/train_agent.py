@@ -44,7 +44,7 @@ def train_volcanoLake_agent(n_episodes, map_path, learning_rate, start_epsilon, 
     env = LimitedVision(env)
     env = TorusWrapper(env)
     env = ActionFlickerWrapper(env)
-    env = gym.wrappers.TimeLimit(env, 75)
+    env = gym.wrappers.TimeLimit(env, 100)
     
     env = gym.wrappers.RecordVideo(
         env, 
