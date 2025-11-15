@@ -2,5 +2,4 @@ gymnasium==1.2.1
 numpy==2.3.4
 matplotlib==3.10.7
 pygame==2.6.1
-tqdm
-pandas
+tqdm==4.67.1
