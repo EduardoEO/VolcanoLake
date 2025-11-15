@@ -40,9 +40,9 @@ def train_volcanoLake_agent(n_episodes, map_path, learning_rate, start_epsilon, 
         
     # ---- Wrappers ----
     
-    env = IncreasingLavaHoles(env, 5, 0.05)
+    #env = IncreasingLavaHoles(env, 5, 0.05)
     #env = LimitedVision(env)
-    env = gym.wrappers.TimeLimit(env, 25)
+    env = gym.wrappers.TimeLimit(env, 100)
     env = gym.wrappers.RecordVideo(
         env, 
         video_folder = videos_dir,

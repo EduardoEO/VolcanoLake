@@ -108,7 +108,6 @@ def plot_value_heatmap(env, agent, plot_dir="plots"):
     Returns:
         None: Guarda el heatmap como archivo PNG
     """
-    print("Generando heatmap de la Q-Table...")
     os.makedirs(plot_dir, exist_ok=True)
 
     best_values = np.max(agent.q_values, axis=1)
@@ -122,3 +121,70 @@ def plot_value_heatmap(env, agent, plot_dir="plots"):
     heatmap_path = os.path.join(plot_dir, "volcanolake_value_heatmap.png")
     plt.savefig(heatmap_path)
     plt.close()
+
+def plot_policy_map(env, agent, plot_dir="plots"):
+    """
+    Genera y guarda un mapa de la política óptima del agente entrenado.
+    
+    Visualiza las acciones óptimas de cada estado como flechas direccionales
+    sobre una grilla que representa el entorno. Las flechas indican la dirección
+    de movimiento que el agente considera mejor según su Q-table entrenada.
+    No se muestran flechas en estados terminales (Lava 'L' y Meta 'G').
+    
+    Args:
+        env: Entorno VolcanoLake (con acceso a dimensiones y descripción del mapa)
+        agent: Agente Q-Learning entrenado (con Q-table completa)
+        plot_dir (str): Directorio donde guardar el archivo PNG del mapa de política
+    
+    Returns:
+        None: Guarda el mapa de política como archivo PNG
+    """
+    os.makedirs(plot_dir, exist_ok=True)
+    unwrapped_env = env.unwrapped
+
+    fig, ax = plt.subplots(figsize=(12, 10))
+
+    best_actions_map = np.argmax(agent.q_values, axis=1).reshape((unwrapped_env.nrows, unwrapped_env.ncols))
+
+    action_to_uv = {
+        action: (delta[1], delta[0]) 
+        for action, delta in unwrapped_env.action_to_delta.items()
+    }
+    
+    U = np.zeros_like(best_actions_map, dtype=float)
+    V = np.zeros_like(best_actions_map, dtype=float)
+    
+    for r in range(unwrapped_env.nrows):
+        for c in range(unwrapped_env.ncols):
+            action = best_actions_map[r, c]
+            u, v = action_to_uv[action]
+            
+            # No dibujar flechas en casillas terminales (Lava, Meta)
+            tile = unwrapped_env.base_desc[r, c]
+            if tile in ['G', 'L']:
+                U[r, c] = 0
+                V[r, c] = 0
+            else:
+                U[r, c] = u
+                V[r, c] = v
+
+    X, Y = np.meshgrid(np.arange(unwrapped_env.ncols), np.arange(unwrapped_env.nrows))
+    
+    ax.quiver(X, Y, U, V, color='black', pivot='middle', headwidth=4, headlength=5)
+    
+    # Invertimos el eje Y para que (0,0) esté arriba a la izquierda
+    ax.invert_yaxis() 
+    
+    ax.set_title(f"Mapa de Política (Q-Table) - Mapa {unwrapped_env.nrows}x{unwrapped_env.ncols}")
+    ax.set_xticks(np.arange(unwrapped_env.ncols))
+    ax.set_yticks(np.arange(unwrapped_env.nrows))
+    ax.set_xticklabels(np.arange(unwrapped_env.ncols))
+    ax.set_yticklabels(np.arange(unwrapped_env.nrows))
+    
+    # Añadimos una rejilla para que sea más fácil de leer
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+    ax.set_aspect('equal') # Hace que las casillas sean cuadradas
+
+    policy_path = os.path.join(plot_dir, "volcanolake_policy_map.png")
+    plt.savefig(policy_path)
+    plt.close(fig)
