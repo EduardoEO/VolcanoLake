@@ -48,8 +48,7 @@ def plot_training(env, agent, plot_save=False, rolling_length=500):
     axs[0,2].set_title("Error de entrenamiento (TD)")
     
     # Tasa de éxito
-    # Asumimos que un "éxito" es una recompensa final > 5
-    win_episodes = (np.array(env.return_queue).flatten() > 5).astype(float)
+    win_episodes = np.array(env.unwrapped.success_queue).flatten()
     win_rate_ma = np.convolve(win_episodes, 
                           np.ones(rolling_length), mode="valid") / rolling_length
     axs[1,0].plot(range(len(win_rate_ma)), win_rate_ma)
