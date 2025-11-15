@@ -12,7 +12,7 @@ if __name__ == "__main__":
 
     # Parametros del entrenamiento
     N_EPISODES = 100_000
-    MAP_FILE = "VolcanoLake_v3/maps/map_5x5.csv"
+    MAP_FILE = "VolcanoLake_v3/maps/map_25x25.csv"
     
     #Parámetros del algoritmo Q-Learning
     LEARNING_RATE = 0.1

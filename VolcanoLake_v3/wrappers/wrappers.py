@@ -161,3 +161,97 @@ class LimitedVision(Wrapper):
             
         # Devolvemos las letras de las casillas (ej. '.', 'L')
         return (current_tile, front_tile)
+
+class ActionFlickerWrapper(Wrapper):
+    """
+    Simula un "controlador defectuoso".
+    Con una probabilidad flicker_prob, ignora la acción
+    elegida por el agente y la sustituye por una acción aleatoria.
+    """
+    def __init__(self, env, flicker_prob: float = 0.1):
+        super().__init__(env)
+        self.flicker_prob = flicker_prob
+        
+    def step(self, action):
+        
+        if np.random.rand() < self.flicker_prob:
+            flickered_action = self.env.action_space.sample()
+            return self.env.step(flickered_action)
+        else:
+            # Se ejecuta la acción que el agente quería.
+            return self.env.step(action)
+
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
+
+class TorusWrapper(Wrapper):
+    """
+    Mundo "Toro" (Toroidal).
+    
+    Cuando el agente choca contra un borde o esquina (es decir,
+    next_obs == obs_before), lo teletransporta al lado opuesto.
+    
+    Acciones V3:
+    - 0: Arriba
+    - 1: Derecha
+    - 2: Abajo
+    - 3: Izquierda
+    - 4: Arriba-Derecha
+    - 5: Abajo-Derecha
+    - 6: Abajo-Izquierda
+    - 7: Arriba-Izquierda
+    """
+    
+    def __init__(self, env):
+        super().__init__(env)
+        # Obtenemos las dimensiones desde el entorno V3
+        self.nrows = self.env.unwrapped.nrows
+        self.ncols = self.env.unwrapped.ncols
+
+    def step(self, action):
+        
+        # Estado ANTES de moverse
+        obs_before = self.env.unwrapped.agent_state
+        
+        # Paso normal del entorno V3
+        next_obs, reward, terminated, truncated, info = self.env.step(action)
+        
+        # Si la observación no cambió (chocamos) y el episodio no terminó
+        if (next_obs == obs_before) and not terminated:
+            
+            # Obtenemos la posición actual
+            i, j = self.env.unwrapped._state_to_pos(obs_before)
+            
+            new_state = obs_before # Por defecto, no cambia
+
+            # --- Lógica Cardinal (Corregida para V3) ---
+            if action == 3 and j == 0:  # 3=Izquierda en borde izquierdo
+                new_state = self.env.unwrapped._pos_to_state(i, self.ncols - 1)
+            elif action == 1 and j == self.ncols - 1: # 1=Derecha en borde derecho
+                new_state = self.env.unwrapped._pos_to_state(i, 0)
+            elif action == 0 and i == 0: # 0=Arriba en borde superior
+                new_state = self.env.unwrapped._pos_to_state(self.nrows - 1, j)
+            elif action == 2 and i == self.nrows - 1: # 2=Abajo en borde inferior
+                new_state = self.env.unwrapped._pos_to_state(0, j)
+
+            # --- ¡NUEVO: Lógica Diagonal (Solo esquinas)! ---
+            elif action == 7 and i == 0 and j == 0: # 7=Arriba-Izq en esquina (0,0)
+                new_state = self.env.unwrapped._pos_to_state(self.nrows - 1, self.ncols - 1)
+            elif action == 4 and i == 0 and j == self.ncols - 1: # 4=Arriba-Der en esquina (0, M-1)
+                new_state = self.env.unwrapped._pos_to_state(self.nrows - 1, 0)
+            elif action == 6 and i == self.nrows - 1 and j == 0: # 6=Abajo-Izq en esquina (N-1, 0)
+                new_state = self.env.unwrapped._pos_to_state(0, self.ncols - 1)
+            elif action == 5 and i == self.nrows - 1 and j == self.ncols - 1: # 5=Abajo-Der en esquina (N-1, M-1)
+                new_state = self.env.unwrapped._pos_to_state(0, 0)
+
+            # Actualiza el estado interno real del entorno
+            # ¡CORREGIDO para V3!
+            self.env.unwrapped.agent_state = new_state
+            
+            # Sobrescribe la observación de "choque" con la nueva
+            next_obs = new_state
+
+        return next_obs, reward, terminated, truncated, info
+
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
