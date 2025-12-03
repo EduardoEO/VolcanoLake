@@ -3,34 +3,34 @@ from gymnasium import Wrapper
 
 class IncreasingLavaHoles(Wrapper):
     """
-    Añade 'L' (Lava) dinámicamente al mapa.
+    Dynamically adds 'L' (Lava) to the map.
     
-    Los hoyos añadidos persisten entre episodios, acumulándose
-    hasta llegar al 'lim_holes'.
+    The added holes persist between episodes, accumulating
+    until reaching 'lim_holes'.
     """
     def __init__(self, env, lim_holes, prob_new_hole=0.05):
         super().__init__(env)
         
         if not hasattr(self.env.unwrapped, "current_desc"):
-            raise TypeError("Este wrapper solo funciona con VolcanoLakeEnv.")
+            raise TypeError("This wrapper only works with VolcanoLakeEnv.")
             
         self.prob_new_hole = prob_new_hole
         self.lim_holes = lim_holes
         
-        # Almacena todos los hoyos creados durante toda la sesión.
+        # Stores all holes created during the entire session.
         self.dynamic_holes = set() 
 
     def reset(self, **kwargs):
         """
-        Resetea el entorno base Y LUEGO re-aplica todos los
-        hoyos de lava permanentes que se han creado hasta ahora.
+        Resets the base environment AND THEN re-applies all the
+        permanent lava holes that have been created so far.
         """
-        # 1. Resetea el entorno base.
-        # ESTO BORRA EL MAPA y lo restaura desde el .csv
+        # 1. Resets the base environment.
+        # THIS DELETES THE MAP and restores it from the .csv
         obs, info = self.env.reset(**kwargs)
         
-        # 2. Ahora, volvemos a poner todos los hoyos de lava permanentes
-        # que teníamos guardados en el mapa 'current_desc' limpio.
+        # 2. Now, we put back all the permanent lava holes
+        # that we had saved on the clean 'current_desc' map.
         desc = self.env.unwrapped.current_desc
         for (i, j) in self.dynamic_holes:
             desc[i, j] = 'L'
@@ -39,12 +39,12 @@ class IncreasingLavaHoles(Wrapper):
 
     def step(self, action):
         """
-        Ejecuta el paso y, si no se ha alcanzado el límite,
-        intenta añadir un NUEVO hoyo de lava permanente.
+        Executes the step and, if the limit has not been reached,
+        attempts to add a NEW permanent lava hole.
         """
         obs, reward, terminated, truncated, info = self.env.step(action)
 
-        # Si el episodio no ha terminado Y aún no hemos llegado al límite
+        # If the episode has not ended AND we haven't reached the limit yet
         if (not terminated and not truncated and 
             len(self.dynamic_holes) < self.lim_holes and
             self.np_random.random() < self.prob_new_hole):
@@ -55,8 +55,8 @@ class IncreasingLavaHoles(Wrapper):
 
     def _add_random_lava_hole(self):
         """
-        Encuentra una casilla segura ('.' o 'T') y la convierte en 'L'.
-        Este cambio es permanente (se añade a self.dynamic_holes).
+        Finds a safe tile ('.' or 'T') and converts it to 'L'.
+        This change is permanent (added to self.dynamic_holes).
         """
         desc = self.env.unwrapped.current_desc
         map_shape = desc.shape
@@ -64,8 +64,8 @@ class IncreasingLavaHoles(Wrapper):
         valid_positions = []
         for i in range(map_shape[0]):
             for j in range(map_shape[1]):
-                # Solo convertimos casillas que AÚN son seguras
-                # (No 'S', 'G', 'L', 'W' o un hoyo ya existente)
+                # We only convert tiles that are STILL safe
+                # (Not 'S', 'G', 'L', 'W' or an existing hole)
                 if desc[i, j] in ['.', 'T']:
                     valid_positions.append((i, j))
         
@@ -73,100 +73,100 @@ class IncreasingLavaHoles(Wrapper):
             idx = self.np_random.integers(len(valid_positions))
             i, j = valid_positions[idx]
             
-            # 1. Modificamos el mapa del episodio actual
+            # 1. We modify the current episode's map
             desc[i, j] = 'L' 
             
-            # 2. Guardamos el hoyo en nuestro 'set' permanente
+            # 2. We save the hole in our permanent 'set'
             self.dynamic_holes.add((i, j))
             
 class LimitedVision(Wrapper):
     """
-    El agente tiene una dirección (0-7).
+    The agent has a direction (0-7).
     
-    - La acción que toma se convierte en su nueva dirección.
-    - Aplica una pequeña penalización de reward shaping si la casilla en la dirección que mira es peligrosa ('L' o 'W').
-    - Añade la visión a info["vision"].
+    - The action taken becomes its new direction.
+    - Applies a small reward shaping penalty if the tile in the direction it faces is dangerous ('L' or 'W').
+    - Adds the vision to info["vision"].
     """
     
     def __init__(self, env, vision_penalty=-0.1):
         super().__init__(env)
         
-        # Comprobamos que el entorno tiene action_to_delta
+        # Check that the environment has action_to_delta
         if not hasattr(self.env.unwrapped, "action_to_delta"):
-            raise TypeError("Este wrapper solo funciona con un entorno que tenga 'action_to_delta', como VolcanoLakeEnv.")
+            raise TypeError("This wrapper only works with an environment that has 'action_to_delta', such as VolcanoLakeEnv.")
             
-        # 0-7, coincide con las acciones del env
-        self.direction = 1  # Empezamos mirando a la derecha
+        # 0-7, matches the env actions
+        # We start looking to the right
+        self.direction = 1  
         self.penalty = vision_penalty
 
     def reset(self, **kwargs):
-        """ Resetea el entorno y la dirección del agente. """
+        """ Resets the environment and the agent's direction. """
         obs, info = self.env.reset(**kwargs)
         
-        # Resetea la dirección
-        self.direction = 1  # Mirando a la derecha
+        self.direction = 1  # Resets direction, looking to the right
         
-        # Añade la visión inicial al 'info'
+        # Adds initial vision to 'info'
         info["vision"] = self._get_vision_in_front(obs)
         
         return obs, info
 
     def step(self, action):
         """
-        Ejecuta el paso, aplica el reward shaping y actualiza la dirección.
+        Executes the step, applies reward shaping, and updates the direction.
         """
-        # El entorno base calcula el resultado del paso
+        # The base environment calculates the step result
         obs, reward, terminated, truncated, info = self.env.step(action)
         
-        # Obtenemos la visión (casilla actual, casilla enfrente) en la dirección que *teníamos*
+        # We get the vision (current tile, front tile) in the direction we *were* looking
         vision_tiles = self._get_vision_in_front(obs)
         info["vision"] = vision_tiles
         
         front_tile = vision_tiles[1] # 'L', 'W', 'G', 'T', '.', 'S'
 
-        # Aplicamos el reward shaping (Solo si el episodio no ha terminado por otra razón)
+        # Apply reward shaping (Only if the episode has not ended for another reason)
         if not terminated:
             if front_tile == 'L' or front_tile == 'W':
-                reward += self.penalty # Añade penalización (-0.1)
+                reward += self.penalty # Adds penalty (-0.1)
                 
-        # ACTUALIZAMOS la dirección del agente. La nueva dirección es la acción que acabamos de tomar
+        # UPDATE the agent's direction. The new direction is the action we just took
         self.direction = action
         
         return obs, reward, terminated, truncated, info
 
     def _get_vision_in_front(self, obs):
         """
-        Devuelve (casilla_actual, casilla_enfrente) basándose
-        en la 'self.direction' actual del agente.
+        Returns (current_tile, front_tile) based on the agent's current 'self.direction'.
         """
         desc = self.env.unwrapped.current_desc
         nrows, ncols = desc.shape
         
-        # Posición actual del agente
+        # Current agent position
         current_row, current_col = self.env.unwrapped._state_to_pos(obs)
         current_tile = desc[current_row, current_col]
 
-        # Obtener el delta de la dirección en la que miramos. Usamos el mapeo de acciones del entorno base
+        # Get the delta of the direction we are looking at. We use the base environment's action mapping
         (dr, dc) = self.env.unwrapped.action_to_delta[self.direction]
         
-        # Calcular la posición de la casilla de enfrente
+        # Calculate the position of the front tile
         front_row = current_row + dr
         front_col = current_col + dc
 
-        # Comprobar límites
+        # Check limits
         if not (0 <= front_row < nrows and 0 <= front_col < ncols):
-            front_tile = 'L' # Ver "fuera del mapa" es como ver Lava
+            # Seeing "outside the map" is like seeing Lava
+            front_tile = 'L' 
         else:
             front_tile = desc[front_row, front_col]
             
-        # Devolvemos las letras de las casillas (ej. '.', 'L')
+        # Return the letters of the tiles (e.g., '.', 'L')
         return (current_tile, front_tile)
 
 class ActionFlickerWrapper(Wrapper):
     """
-    Simula un "controlador defectuoso".
-    Con una probabilidad flicker_prob, ignora la acción
-    elegida por el agente y la sustituye por una acción aleatoria.
+    Simulates a "defective controller".
+    With a flicker_prob probability, it ignores the action
+    chosen by the agent and substitutes it with a random action.
     """
     def __init__(self, env, flicker_prob: float = 0.1):
         super().__init__(env)
@@ -178,7 +178,7 @@ class ActionFlickerWrapper(Wrapper):
             flickered_action = self.env.action_space.sample()
             return self.env.step(flickered_action)
         else:
-            # Se ejecuta la acción que el agente quería.
+            # The action the agent wanted is executed.
             return self.env.step(action)
 
     def reset(self, **kwargs):
@@ -186,69 +186,77 @@ class ActionFlickerWrapper(Wrapper):
 
 class TorusWrapper(Wrapper):
     """
-    Mundo "Toro" (Toroidal).
+    "Torus" (Toroidal) World.
     
-    Cuando el agente choca contra un borde o esquina (es decir,
-    next_obs == obs_before), lo teletransporta al lado opuesto.
+    When the agent hits an edge or corner (i.e.,
+    next_obs == obs_before), it teleports it to the opposite side.
     
-    Acciones V3:
-    - 0: Arriba
-    - 1: Derecha
-    - 2: Abajo
-    - 3: Izquierda
-    - 4: Arriba-Derecha
-    - 5: Abajo-Derecha
-    - 6: Abajo-Izquierda
-    - 7: Arriba-Izquierda
+    V3 Actions:
+    - 0: Up
+    - 1: Right
+    - 2: Down
+    - 3: Left
+    - 4: Up-Right
+    - 5: Down-Right
+    - 6: Down-Left
+    - 7: Up-Left
     """
     
     def __init__(self, env):
         super().__init__(env)
-        # Obtenemos las dimensiones desde el entorno V3
+        # We get dimensions from the environment
         self.nrows = self.env.unwrapped.nrows
         self.ncols = self.env.unwrapped.ncols
 
     def step(self, action):
         
-        # Estado ANTES de moverse
+        # State BEFORE moving
         obs_before = self.env.unwrapped.agent_state
         
-        # Paso normal del entorno V3
+        # Normal V3 environment step
         next_obs, reward, terminated, truncated, info = self.env.step(action)
         
-        # Si la observación no cambió (chocamos) y el episodio no terminó
+        # If the observation didn't change (we hit a wall) and the episode didn't end
         if (next_obs == obs_before) and not terminated:
             
-            # Obtenemos la posición actual
+            # Get current position
             i, j = self.env.unwrapped._state_to_pos(obs_before)
             
-            new_state = obs_before # Por defecto, no cambia
+            # By default, it doesn't change
+            new_state = obs_before 
 
-            # --- Lógica Cardinal (Corregida para V3) ---
-            if action == 3 and j == 0:  # 3=Izquierda en borde izquierdo
+            # --- Cardinal Logic (Corrected for V3) ---
+            # 3=Left at left edge
+            if action == 3 and j == 0:  
                 new_state = self.env.unwrapped._pos_to_state(i, self.ncols - 1)
-            elif action == 1 and j == self.ncols - 1: # 1=Derecha en borde derecho
+            # 1=Right at right edge
+            elif action == 1 and j == self.ncols - 1: 
                 new_state = self.env.unwrapped._pos_to_state(i, 0)
-            elif action == 0 and i == 0: # 0=Arriba en borde superior
+            # 0=Up at top edge
+            elif action == 0 and i == 0: 
                 new_state = self.env.unwrapped._pos_to_state(self.nrows - 1, j)
-            elif action == 2 and i == self.nrows - 1: # 2=Abajo en borde inferior
+            # 2=Down at bottom edge
+            elif action == 2 and i == self.nrows - 1: 
                 new_state = self.env.unwrapped._pos_to_state(0, j)
 
-            # --- ¡NUEVO: Lógica Diagonal (Solo esquinas)! ---
-            elif action == 7 and i == 0 and j == 0: # 7=Arriba-Izq en esquina (0,0)
+            # --- NEW: Diagonal Logic (Corners only)! ---
+            # 7=Up-Left at corner (0,0)
+            elif action == 7 and i == 0 and j == 0: 
                 new_state = self.env.unwrapped._pos_to_state(self.nrows - 1, self.ncols - 1)
-            elif action == 4 and i == 0 and j == self.ncols - 1: # 4=Arriba-Der en esquina (0, M-1)
+            # 4=Up-Right at corner (0, M-1)
+            elif action == 4 and i == 0 and j == self.ncols - 1: 
                 new_state = self.env.unwrapped._pos_to_state(self.nrows - 1, 0)
-            elif action == 6 and i == self.nrows - 1 and j == 0: # 6=Abajo-Izq en esquina (N-1, 0)
+            # 6=Down-Left at corner (N-1, 0)
+            elif action == 6 and i == self.nrows - 1 and j == 0: 
                 new_state = self.env.unwrapped._pos_to_state(0, self.ncols - 1)
-            elif action == 5 and i == self.nrows - 1 and j == self.ncols - 1: # 5=Abajo-Der en esquina (N-1, M-1)
+            # 5=Down-Right at corner (N-1, M-1)
+            elif action == 5 and i == self.nrows - 1 and j == self.ncols - 1: 
                 new_state = self.env.unwrapped._pos_to_state(0, 0)
 
-            # Actualiza el estado interno real del entorno
-            # ¡CORREGIDO para V3!
+            # Updates the real internal state of the environment
             self.env.unwrapped.agent_state = new_state
             
-            # Sobrescribe la observación de "choque" con la nueva
+            # Overwrites the 'collision' observation with the new one
             next_obs = new_state
 
         return next_obs, reward, terminated, truncated, info

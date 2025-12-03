@@ -3,88 +3,88 @@ import matplotlib.pyplot as plt
 import os
 
 # -----------------------------
-# Función para visualización
+# Visualization functions
 # -----------------------------
 
 def plot_training(env, agent, plot_save=False, rolling_length=500):
     """
-    Genera gráficos de métricas del entrenamiento del agente Q-Learning.
+    Generates training metric plots for the Q-Learning agent.
     
-    Crea un conjunto de 5 visualizaciones distribuidas en layout 2x3:
-    - Recompensas acumuladas por episodio (suavizadas)
-    - Duración de episodios (pasos por episodio)  
-    - Error de entrenamiento TD (Temporal Difference)
-    - Tasa de éxito (porcentaje de episodios que alcanzan la meta)
-    - Tesoros recogidos por episodio (si están disponibles)
+    Creates a set of 5 visualizations distributed in a 2x3 layout:
+    - Accumulated rewards per episode (smoothed)
+    - Episode duration (steps per episode)  
+    - TD (Temporal Difference) training error
+    - Success rate (percentage of episodes reaching the goal)
+    - Treasures collected per episode (if available)
     
     Args:
-        env: Entorno de entrenamiento (con wrappers RecordEpisodeStatistics)
-        agent: Agente Q-Learning entrenado con historial de errores
-        plot_save (bool): Si True, guarda las gráficas en carpeta plots/
-        rolling_length (int): Ventana para suavizado de curvas (media móvil)
+        env: Training environment (with RecordEpisodeStatistics wrappers)
+        agent: Trained Q-Learning agent with error history
+        plot_save (bool): If True, saves plots to plots/ folder
+        rolling_length (int): Window for curve smoothing (moving average)
     
     Returns:
-        None: Muestra o guarda las gráficas según plot_save
+        None: Shows or saves plots according to plot_save
     """
     fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(18, 8))
     fig.suptitle("Entrenamiento del agente volcanoLake", fontsize=16)
 
-    # Recompensas
+    # Rewards
     reward_ma = np.convolve(np.array(env.return_queue).flatten(),
                             np.ones(rolling_length), mode="valid") / rolling_length
     axs[0,0].plot(range(len(reward_ma)), reward_ma)
     axs[0,0].set_title("Recompensas por episodio")
 
-    # Duración de episodios
+    # Episode duration
     length_ma = np.convolve(np.array(env.length_queue).flatten(),
                             np.ones(rolling_length), mode="same") / rolling_length
     axs[0,1].plot(range(len(length_ma)), length_ma)
     axs[0,1].set_title("Duración de episodios")
 
-    # Error de entrenamiento
+    # Training error
     td_ma = np.convolve(np.array(agent.training_error),
                         np.ones(rolling_length), mode="same") / rolling_length
     axs[0,2].plot(range(len(td_ma)), td_ma)
     axs[0,2].set_title("Error de entrenamiento (TD)")
     
-    # Tasa de éxito
+    # Success rate
     win_episodes = np.array(env.unwrapped.success_queue).flatten()
     win_rate_ma = np.convolve(win_episodes, 
-                          np.ones(rolling_length), mode="valid") / rolling_length
+                              np.ones(rolling_length), mode="valid") / rolling_length
     axs[1,0].plot(range(len(win_rate_ma)), win_rate_ma)
     axs[1,0].set_title("Tasa de Éxito (Meta alcanzada)")
-    axs[1,0].set_ylim(0, 1.05) # Fija el eje Y entre 0 y 100%
+    # Fix the Y axis between 0 and 100%
+    axs[1,0].set_ylim(0, 1.05) 
     
-    # Media de tesoros recogidos por episodio (acceder al entorno original)
+    # Average treasures collected per episode (access original environment)
     try:
-        # Intentar acceder al atributo en el entorno unwrapped
+        # Try to access the attribute in the unwrapped environment
         treasures_data = np.array(env.unwrapped.treasures_found_queue).flatten()
         treasure_ma = np.convolve(treasures_data,
                                   np.ones(rolling_length), mode="valid") / rolling_length
         axs[1,1].plot(range(len(treasure_ma)), treasure_ma)
         axs[1,1].set_title("Tesoros recogidos por episodio")
     except (AttributeError, ValueError):
-        # Si no existe el atributo o está vacío, mostrar mensaje
+        # If the attribute does not exist or is empty, show message
         axs[1,1].text(0.5, 0.5, 'No hay datos de tesoros disponibles', 
                       horizontalalignment='center', verticalalignment='center',
                       transform=axs[1,1].transAxes)
         axs[1,1].set_title("Tesoros recogidos por episodio")
 
-    # Ocultar el subplot vacío
+    # Hide the empty subplot
     axs[1,2].axis('off')
 
     plt.tight_layout()
     
     if plot_save:
-        # Obtener directorio del proyecto (VolcanoLake_v3)
+        # Get project directory (VolcanoLake_v3)
         script_dir = os.path.dirname(os.path.abspath(__file__)) # utils/
         project_root = os.path.dirname(script_dir) # VolcanoLake_v3/
         plots_dir = os.path.join(project_root, "plots") # VolcanoLake_v3/plots/
+        os.makedirs(plots_dir, exist_ok=True) # Create directory if it does not exist
+
         
-        # Crear directorio si no existe
-        os.makedirs(plots_dir, exist_ok=True)
-        
-        # Guardar con ruta absoluta
+        # Save with absolute path
         save_path = os.path.join(plots_dir, "volcanolake_training_metrics.png")
         
         plt.savefig(save_path)
@@ -93,19 +93,19 @@ def plot_training(env, agent, plot_save=False, rolling_length=500):
             
 def plot_value_heatmap(env, agent, plot_dir="plots"):
     """
-    Genera y guarda un heatmap del valor de la Q-Table del agente entrenado.
+    Generates and saves a heatmap of the Q-Table values of the trained agent.
     
-    Visualiza los valores máximos de cada estado (max Q-value) como un mapa de calor
-    sobre la grilla del entorno, permitiendo identificar qué estados son más valiosos
-    para el agente después del entrenamiento.
+    Visualizes the maximum values of each state (max Q-value) as a heatmap
+    over the environment grid, allowing identification of which states are most valuable
+    to the agent after training.
     
     Args:
-        env: Entorno VolcanoLake (con acceso a dimensiones del mapa)
-        agent: Agente Q-Learning entrenado (con Q-table completa)
-        plot_dir (str): Directorio donde guardar el archivo PNG del heatmap
+        env: VolcanoLake environment (with access to map dimensions)
+        agent: Trained Q-Learning agent (with complete Q-table)
+        plot_dir (str): Directory where to save the heatmap PNG file
     
     Returns:
-        None: Guarda el heatmap como archivo PNG
+        None: Saves the heatmap as a PNG file
     """
     os.makedirs(plot_dir, exist_ok=True)
 
@@ -123,20 +123,20 @@ def plot_value_heatmap(env, agent, plot_dir="plots"):
 
 def plot_policy_map(env, agent, plot_dir="plots"):
     """
-    Genera y guarda un mapa de la política óptima del agente entrenado.
+    Generates and saves a map of the trained agent's optimal policy.
     
-    Visualiza las acciones óptimas de cada estado como flechas direccionales
-    sobre una grilla que representa el entorno. Las flechas indican la dirección
-    de movimiento que el agente considera mejor según su Q-table entrenada.
-    No se muestran flechas en estados terminales (Lava 'L' y Meta 'G').
+    Visualizes the optimal actions of each state as directional arrows
+    on a grid representing the environment. The arrows indicate the direction
+    of movement the agent considers best according to its trained Q-table.
+    No arrows are shown in terminal states (Lava 'L' and Goal 'G').
     
     Args:
-        env: Entorno VolcanoLake (con acceso a dimensiones y descripción del mapa)
-        agent: Agente Q-Learning entrenado (con Q-table completa)
-        plot_dir (str): Directorio donde guardar el archivo PNG del mapa de política
+        env: VolcanoLake environment (with access to map dimensions and description)
+        agent: Trained Q-Learning agent (with complete Q-table)
+        plot_dir (str): Directory where to save the policy map PNG file
     
     Returns:
-        None: Guarda el mapa de política como archivo PNG
+        None: Saves the policy map as a PNG file
     """
     os.makedirs(plot_dir, exist_ok=True)
     unwrapped_env = env.unwrapped
@@ -158,7 +158,7 @@ def plot_policy_map(env, agent, plot_dir="plots"):
             action = best_actions_map[r, c]
             u, v = action_to_uv[action]
             
-            # No dibujar flechas en casillas terminales (Lava, Meta)
+            # Do not draw arrows in terminal tiles (Lava, Goal)
             tile = unwrapped_env.base_desc[r, c]
             if tile in ['G', 'L']:
                 U[r, c] = 0
@@ -171,7 +171,7 @@ def plot_policy_map(env, agent, plot_dir="plots"):
     
     ax.quiver(X, Y, U, V, color='black', pivot='middle', headwidth=4, headlength=5)
     
-    # Invertimos el eje Y para que (0,0) esté arriba a la izquierda
+    # We invert the Y axis so that (0,0) is at the top left
     ax.invert_yaxis() 
     
     ax.set_title(f"Mapa de Política (Q-Table) - Mapa {unwrapped_env.nrows}x{unwrapped_env.ncols}")
@@ -180,9 +180,9 @@ def plot_policy_map(env, agent, plot_dir="plots"):
     ax.set_xticklabels(np.arange(unwrapped_env.ncols))
     ax.set_yticklabels(np.arange(unwrapped_env.nrows))
     
-    # Añadimos una rejilla para que sea más fácil de leer
+    # We add a grid to make it easier to read
     ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-    ax.set_aspect('equal') # Hace que las casillas sean cuadradas
+    ax.set_aspect('equal') # Makes the tiles square
 
     policy_path = os.path.join(plot_dir, "volcanolake_policy_map.png")
     plt.savefig(policy_path)

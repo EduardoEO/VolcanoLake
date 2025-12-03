@@ -5,107 +5,123 @@ import pygame
 
 class VolcanoLakeEnv(gym.Env):
     """
-    Entorno personalizado VolcanoLake_v3.
+    Custom VolcanoLake_v3 environment.
     
-    Aclaraciones iniciales:
-    Reglas:
-    - S: Inicio
-    - G: Meta (+10, termina)
-    - L: Lava (-10, termina)
-    - W: Agua (-1, resbala)
-    - T: Tesoro (+5, continúa, se consume)
-    - .: Tierra (0)
+    Initial clarifications:
+    Rules:
+    - S: Start
+    - G: Goal (+10, terminates)
+    - L: Lava (-10, terminates)
+    - W: Water (-1, slips)
+    - T: Treasure (+5, continues, is consumed)
+    - .: Land (0)
     
-    Acciones (8):
-    - 0: Arriba
-    - 1: Derecha
-    - 2: Abajo
-    - 3: Izquierda
-    - 4: Arriba-Derecha
-    - 5: Abajo-Derecha
-    - 6: Abajo-Izquierda
-    - 7: Arriba-Izquierda
+    Actions (8):
+    - 0: Up
+    - 1: Right
+    - 2: Down
+    - 3: Left
+    - 4: Up-Right
+    - 5: Down-Right
+    - 6: Down-Left
+    - 7: Up-Left
     
-    Lógica de Agua (W):
-    - 80% de éxito.
-    - 10% de resbalar a 90° izq (cardinal) o componente 1 (diagonal).
-    - 10% de resbalar a 90° der (cardinal) o componente 2 (diagonal).
+    Water Logic (W):
+    - 80% success.
+    - 10% slip 90° left (cardinal) or component 1 (diagonal).
+    - 10% slip 90° right (cardinal) or component 2 (diagonal).
     """
     
-    # Opcional: metadata para el modo render
+    # Optional: metadata for render mode
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     def __init__(self, map_file_path=None, render_mode=None):
         """
-        Inicializa el entorno VolcanoLake v3.
+        Initializes the VolcanoLake v3 environment.
         
         Args:
-            map_file_path (str, optional): Ruta al archivo CSV del mapa. 
-                                          Si es None, usa el mapa por defecto (map_25x25.csv).
-            render_mode (str, optional): Modo de renderizado ('human', 'rgb_array', o None).
-                                        - 'human': Muestra ventana gráfica en pantalla
-                                        - 'rgb_array': Devuelve arrays para grabación de video
-                                        - None: No renderiza
+            map_file_path (str, optional): Path to the map CSV file. 
+                                           If None, uses default map (map_25x25.csv).
+            render_mode (str, optional): Rendering mode ('human', 'rgb_array', or None).
+                                         - 'human': Shows graphic window on screen
+                                         - 'rgb_array': Returns arrays for video recording
+                                         - None: Does not render
         """
         super().__init__()
 
-        # Mapa predeterminado
+        # Default map
         if map_file_path is None:
             current_dir = os.path.dirname(__file__)
             map_file_path = os.path.join(current_dir, '..', 'map_25x25.csv')            
         
-        # --- Carga del mapa ---
+        # --- Map Loading ---
         if not os.path.exists(map_file_path):
             raise FileNotFoundError(f"No se pudo encontrar el archivo del mapa: {map_file_path}")
             
-        # Cargamos el mapa base (inmutable)
-        # Usamos 'U' para strings (Unicode)
+        # Load base map (immutable)
+        # Use 'U' for strings (Unicode)
         self.base_desc = np.genfromtxt(map_file_path, dtype='<U1', delimiter=',')
         
-        # Creamos una copia mutable para la sesión actual (para consumir tesoros)
+        # Create a mutable copy for the current session (to consume treasures)
         self.current_desc = np.copy(self.base_desc)
         
         self.nrows, self.ncols = self.base_desc.shape
 
-        # --- Definición de Espacios ---
-        # El espacio de observación es un único entero que representa la posición
+        # --- Space Definition ---
+        # The observation space is a single integer representing the position
         self.observation_space = gym.spaces.Discrete(self.nrows * self.ncols)
         
-        # El espacio de acciones tiene 8 acciones
+        # The action space has 8 actions
         self.action_space = gym.spaces.Discrete(8)
 
-        # --- Mapeo de Acciones ---
-        # (delta_fila, delta_columna)
+        # --- Action Mapping ---
+        # (delta_row, delta_col)
         self.action_to_delta = {
-            0: (-1, 0),  # Arriba
-            1: (0, 1),   # Derecha
-            2: (1, 0),   # Abajo
-            3: (0, -1),  # Izquierda
-            4: (-1, 1),  # Arriba-Derecha
-            5: (1, 1),   # Abajo-Derecha
-            6: (1, -1),  # Abajo-Izquierda
-            7: (-1, -1)  # Arriba-Izquierda
+            # Up
+            0: (-1, 0),
+            # Right
+            1: (0, 1),
+            # Down
+            2: (1, 0),
+            # Left
+            3: (0, -1),
+            # Up-Right
+            4: (-1, 1),
+            # Down-Right
+            5: (1, 1),
+            # Down-Left
+            6: (1, -1),
+            # Up-Left
+            7: (-1, -1)
         }
         
-        # --- Lógica de deslizamiento (Agua 'W') ---
-        # Para acciones cardinales (0-3), mapea a las acciones 90° izq/der
+        # --- Slippage Logic (Water 'W') ---
+        # For cardinal actions (0-3), maps to 90° left/right actions
         self.slip_map_cardinal = {
-            0: (3, 1),  # Arriba -> Izq, Der
-            1: (0, 2),  # Derecha -> Arr, Aba
-            2: (1, 3),  # Abajo -> Der, Izq
-            3: (2, 0)   # Izquierda -> Aba, Arr
+            # Up -> Left, Right
+            0: (3, 1),
+            # Right -> Up, Down
+            1: (0, 2),
+            # Down -> Right, Left
+            2: (1, 3),
+            # Left -> Down, Up
+            3: (2, 0)
         }
         
-        # Para acciones diagonales (4-7), mapea a los *deltas* de sus componentes
+        # For diagonal actions (4-7), maps to the *deltas* of their components
         self.slip_map_diagonal = {
-            4: ((-1, 0), (0, 1)),  # Arriba-Der -> Arriba, Derecha
-            5: ((1, 0), (0, 1)),   # Abajo-Der -> Abajo, Derecha
-            6: ((1, 0), (0, -1)),  # Abajo-Izq -> Abajo, Izquierda
-            7: ((-1, 0), (0, -1))  # Arriba-Izq -> Arriba, Izquierda
+            # Up-Right -> Up, Right
+            4: ((-1, 0), (0, 1)),
+            # Down-Right -> Down, Right
+            5: ((1, 0), (0, 1)),
+            # Down-Left -> Down, Left
+            6: ((1, 0), (0, -1)),
+            # Up-Left -> Up, Left
+            7: ((-1, 0), (0, -1))
         }
 
-        # --- Estado Inicial ---
-        # Encontrar la 'S'
+        # --- Initial State ---
+        # Find the 'S'
         start_pos_array = np.where(self.base_desc == 'S')
         if start_pos_array[0].size == 0:
             raise ValueError("El mapa no contiene un punto de inicio 'S'")
@@ -113,24 +129,31 @@ class VolcanoLakeEnv(gym.Env):
         self.start_pos = (start_pos_array[0][0], start_pos_array[1][0])
         self.start_state = self._pos_to_state(self.start_pos[0], self.start_pos[1])
         
-        # El estado actual del agente (se reiniciará en reset())
+        # The agent's current state (will be reset in reset())
         self.agent_state = self.start_state
         
-        # --- Tracking de estadísticas ---
-        self.treasures_found_queue = [] # Historial de tesoros por episodio
-        self.current_episode_treasures = 0 # Contador del episodio actual
+        # --- Statistics Tracking ---
+        # Treasure history per episode
+        self.treasures_found_queue = []
+        # Current episode counter
+        self.current_episode_treasures = 0
         
-        self.success_queue = [] # Historial de éxito por episodio
-        self.current_episode_success = False # Flag para el episodio actual
+        # Success history per episode
+        self.success_queue = []
+        # Flag for current episode
+        self.current_episode_success = False
         
         self.just_initialized = True
     
-        # --- Configuración del renderizado ---
-        self.render_mode = render_mode # Almacenamos el modo
-        self.window = None # Ventana de Pygame (se crea en render())
-        self.clock = None # Reloj de Pygame
+        # --- Render Configuration ---
+        # Store the mode
+        self.render_mode = render_mode
+        # Pygame window (created in render())
+        self.window = None
+        # Pygame clock
+        self.clock = None
         
-        # Tamaño de cada celda en píxeles
+        # Cell size in pixels
         if self.nrows > 50 or self.ncols > 50:
             self.cell_size = 16 
         elif self.nrows > 20 or self.ncols > 20:
@@ -141,33 +164,40 @@ class VolcanoLakeEnv(gym.Env):
         self.window_width = self.ncols * self.cell_size
         self.window_height = self.nrows * self.cell_size
         
-        # Definición de colores RGB
+        # RGB color definition
         self.colors = {
-            'S': (60, 179, 113), # Verde (Inicio)
-            'G': (255, 215, 0), # Dorado (Meta)
-            'L': (220, 20, 60), # Rojo (Lava)
-            'W': (30, 144, 255), # Azul (Agua)
-            'T': (148, 0, 211), # Violeta (Tesoro)
-            '.': (205, 133, 63), # Marrón (Tierra)
-            'AGENT': (220, 220, 220) # Gris claro (Agente)
+            # Green (Start)
+            'S': (60, 179, 113),
+            # Golden (Goal)
+            'G': (255, 215, 0),
+            # Red (Lava)
+            'L': (220, 20, 60),
+            # Blue (Water)
+            'W': (30, 144, 255),
+            # Violet (Treasure)
+            'T': (148, 0, 211),
+            # Brown (Land)
+            '.': (205, 133, 63),
+            # Light Grey (Agent)
+            'AGENT': (220, 220, 220)
         }
 
 
     def _pos_to_state(self, row, col):
         """
-        Convierte (fila, col) 2D a un estado único y entero, 1D.
-        Ejemplo: Si tienes un mapa de 4x3 (4 filas, 3 columnas)
-        Posición (1, 2) -> estado = 1 x 3 + 2 = 5
-        Posición (0, 0) -> estado = 0 x 3 + 0 = 0
+        Converts 2D (row, col) to a unique 1D state integer.
+        Example: If you have a 4x3 map (4 rows, 3 columns)
+        Position (1, 2) -> state = 1 x 3 + 2 = 5
+        Position (0, 0) -> state = 0 x 3 + 0 = 0
         """
         return row * self.ncols + col
 
     def _state_to_pos(self, state):
         """
-        Convierte un estado 1D a (fila, col).
-        Ejemplo: Si tienes un mapa de 4x3 (4 filas, 3 columnas)
-        Estado 5 en mapa 4x3 -> fila = 5 ÷ 3 = 1, columna = 5 % 3 = 2 -> (1, 2)
-        Estado 0 en mapa 4x3 -> fila = 0 ÷ 3 = 0, columna = 0 % 3 = 0 -> (0, 0)
+        Converts a 1D state to (row, col).
+        Example: If you have a 4x3 map (4 rows, 3 columns)
+        State 5 in 4x3 map -> row = 5 // 3 = 1, col = 5 % 3 = 2 -> (1, 2)
+        State 0 in 4x3 map -> row = 0 // 3 = 0, col = 0 % 3 = 0 -> (0, 0)
         """
         row = state // self.ncols
         col = state % self.ncols
@@ -175,146 +205,157 @@ class VolcanoLakeEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         """
-        Reinicia el entorno al estado inicial para comenzar un nuevo episodio.
+        Resets the environment to the initial state to start a new episode.
         
-        Esta función realiza las siguientes tareas:
-        1. Guarda las estadísticas del episodio anterior (tesoros y éxito)
-        2. Resetea contadores para el nuevo episodio
-        3. Restaura la posición del agente al punto de inicio 'S'
-        4. Restaura todos los tesoros 'T' consumidos durante el episodio anterior
+        This function performs the following tasks:
+        1. Saves statistics from the previous episode (treasures and success)
+        2. Resets counters for the new episode
+        3. Restores the agent's position to the start point 'S'
+        4. Restores all treasures 'T' consumed during the previous episode
         
         Args:
-            seed (int, optional): Semilla para el generador de números aleatorios.
-                                 Útil para reproducibilidad en experimentos.
-            options (dict, optional): Opciones adicionales (reservado para extensiones).
+            seed (int, optional): Seed for the random number generator.
+                                  Useful for reproducibility in experiments.
+            options (dict, optional): Additional options (reserved for extensions).
         
         Returns:
             tuple: (observation, info)
-                - observation (int): Estado inicial del agente (posición de 'S')
-                - info (dict): Diccionario vacío con información adicional
+                - observation (int): Initial agent state (position of 'S')
+                - info (dict): Empty dictionary with additional info
         
         Note:
-            La primera vez que se llama (desde __init__), NO guarda estadísticas
-            porque aún no ha terminado ningún episodio.
+            The first time it is called (from __init__), it DOES NOT save statistics
+            because no episode has finished yet.
         """
         super().reset(seed=seed)
         
-        # Solo guarda los datos si NO es la primera llamada (la de init)
+        # Only save data if it is NOT the first call (the init one)
         if not self.just_initialized:
-            # 1. Guardar tesoros del episodio anterior
+            # 1. Save treasures from previous episode
             self.treasures_found_queue.append(self.current_episode_treasures)
             
-            # 2. Guardar el éxito del episodio anterior
+            # 2. Save success of previous episode
             success_value = 1.0 if self.current_episode_success else 0.0
             self.success_queue.append(success_value)
         
         self.just_initialized = False
         
-        # 2. Resetear contador de tesoros para nuevo episodio
+        # 2. Reset treasure counter for new episode
         self.current_episode_treasures = 0
-        self.current_episode_success = False # Resetear también el flag
+        # Reset the flag too
+        self.current_episode_success = False
 
-        # 3. Resetear la posición del agente
+        # 3. Reset agent position
         self.agent_state = self.start_state
         
-        # 4. Resetear el mapa (restaurar tesoros)
+        # 4. Reset map (restore treasures)
         self.current_desc = np.copy(self.base_desc)
         
-        # Info estándar de Gymnasium
+        # Standard Gymnasium info
         info = {}
         
         return self.agent_state, info
 
     def step(self, action):
         """
-        Ejecuta una acción en el entorno y devuelve el resultado.
+        Executes an action in the environment and returns the result.
         
-        Este es el núcleo del entorno. Procesa la acción del agente siguiendo estos pasos:
-        1. Determina si hay deslizamiento según el tipo de casilla actual
-        2. Calcula el movimiento resultante (puede ser diferente si resbala)
-        3. Actualiza la posición del agente (con clipping en bordes)
-        4. Calcula recompensas según la nueva casilla
-        5. Determina si el episodio terminó
+        This is the core of the environment. It processes the agent's action following these steps:
+        1. Determines if there is slippage based on the current tile type
+        2. Calculates the resulting movement (may be different if it slips)
+        3. Updates the agent's position (with clipping at edges)
+        4. Calculates rewards based on the new tile
+        5. Determines if the episode ended
         
         Args:
-            action (int): Acción a ejecutar (0-7)
-                         0: Arriba, 1: Derecha, 2: Abajo, 3: Izquierda
-                         4: Arriba-Derecha, 5: Abajo-Derecha
-                         6: Abajo-Izquierda, 7: Arriba-Izquierda
+            action (int): Action to execute (0-7)
+                          0: Up, 1: Right, 2: Down, 3: Left
+                          4: Up-Right, 5: Down-Right
+                          6: Down-Left, 7: Up-Left
         
         Returns:
             tuple: (observation, reward, terminated, truncated, info)
-                - observation (int): Nuevo estado del agente
-                - reward (float): Recompensa obtenida en este paso
-                - terminated (bool): True si el episodio terminó (G o L alcanzado)
-                - truncated (bool): True si se alcanzó límite de tiempo (no usado aquí)
-                - info (dict): Información adicional (vacío por ahora)
+                - observation (int): New agent state
+                - reward (float): Reward obtained in this step
+                - terminated (bool): True if the episode ended (G or L reached)
+                - truncated (bool): True if time limit reached (not used here)
+                - info (dict): Additional information (empty for now)
         
-        Mecánicas de deslizamiento en Agua ('W'):
-        - Acciones cardinales (0-3): 80% éxito, 10% resbala 90° izq, 10% resbala 90° der
-        - Acciones diagonales (4-7): 80% éxito, 10% componente vertical, 10% componente horizontal
+        Slippage mechanics in Water ('W'):
+        - Cardinal actions (0-3): 80% success, 10% slip 90° left, 10% slip 90° right
+        - Diagonal actions (4-7): 80% success, 10% vertical component, 10% horizontal component
         
-        Sistema de recompensas:
-        - Meta 'G': +10 (termina episodio exitoso)
-        - Lava 'L': -10 (termina episodio fallido)
-        - Tesoro 'T': +5 (se consume y desaparece)
-        - Agua 'W': -1 (penalización por mojarse)
-        - Tierra '.' / Inicio 'S': -0.001 (pequeño costo para fomentar eficiencia)
+        Reward system:
+        - Goal 'G': +10 (successful episode ends)
+        - Lava 'L': -10 (failed episode ends)
+        - Treasure 'T': +5 (consumed and disappears)
+        - Water 'W': -1 (penalty for getting wet)
+        - Land '.' / Start 'S': -0.001 (small cost to encourage efficiency)
         """
         info = {}
         
-        # 1. Obtener posición y tipo de casilla actual
+        # 1. Get current position and tile type
         current_row, current_col = self._state_to_pos(self.agent_state)
         current_tile = self.current_desc[current_row, current_col]
         
         is_slippery = (current_tile == 'W')
         delta = (0, 0)
 
-        # 2. Determinar el delta de movimiento (lógica de deslizamiento)
+        # 2. Determine movement delta (slippage logic)
         if not is_slippery:
-            # Movimiento determinista
+            # Deterministic movement
             delta = self.action_to_delta[action]
         else:
-            # Movimiento probabilístico (Agua 'W')
-            p = self.np_random.random() # Generador aleatorio de Gym
+            # Probabilistic movement (Water 'W')
+            # Gym random generator
+            p = self.np_random.random()
             
-            if action < 4: # Acción Cardinal
+            # Cardinal Action
+            if action < 4:
                 if p < 0.8:
                     delta = self.action_to_delta[action]
                 elif p < 0.9:
-                    slip_action = self.slip_map_cardinal[action][0] # 90° izq
+                    # 90° left
+                    slip_action = self.slip_map_cardinal[action][0]
                     delta = self.action_to_delta[slip_action]
                 else:
-                    slip_action = self.slip_map_cardinal[action][1] # 90° der
+                    # 90° right
+                    slip_action = self.slip_map_cardinal[action][1]
                     delta = self.action_to_delta[slip_action]
             
-            else: # Acción Diagonal
+            # Diagonal Action
+            else:
                 if p < 0.8:
                     delta = self.action_to_delta[action]
                 elif p < 0.9:
-                    delta = self.slip_map_diagonal[action][0] # Componente 1
+                    # Component 1
+                    delta = self.slip_map_diagonal[action][0]
                 else:
-                    delta = self.slip_map_diagonal[action][1] # Componente 2
+                    # Component 2
+                    delta = self.slip_map_diagonal[action][1]
 
-        # 3. Calcular la nueva posición teórica
+        # 3. Calculate theoretical new position
         dr, dc = delta
         new_row = current_row + dr
         new_col = current_col + dc
 
-        # 4. Manejar colisiones con los bordes (Clipping)
-        # El agente "choca" y se queda en el borde si intenta salir
+        # 4. Handle edge collisions (Clipping)
+        # The agent "hits" and stays at the edge if it tries to exit
         new_row = np.clip(new_row, 0, self.nrows - 1)
         new_col = np.clip(new_col, 0, self.ncols - 1)
 
-        # 5. Actualizar el estado del agente
+        # 5. Update agent state
         self.agent_state = self._pos_to_state(new_row, new_col)
 
-        # 6. Calcular recompensa y estado 'done'
+        # 6. Calculate reward and 'done' state
         new_tile = self.current_desc[new_row, new_col]
         
-        reward = -0.001 # Evitar que el agente aprenda a solo ir a por T en vez de llegar a G
-        terminated = False # 'terminated' es para fines del episodio (G, L)
-        truncated = False # 'truncated' es para límites de tiempo (no usado aquí)
+        # Prevent the agent from learning to only go for T instead of reaching G
+        reward = -0.001
+        # 'terminated' is for episode ends (G, L)
+        terminated = False
+        # 'truncated' is for time limits (not used here)
+        truncated = False
         
         if new_tile == 'G':
             reward = 10
@@ -324,62 +365,66 @@ class VolcanoLakeEnv(gym.Env):
             reward = -10
             terminated = True
         elif new_tile == 'W':
-            reward = -1 # Penalización por caer en agua (además de resbalar)
+            # Penalty for falling into water (besides slipping)
+            reward = -1
         elif new_tile == 'T':
             reward = 5
-            # Consumir el tesoro para este episodio
+            # Consume treasure for this episode
             self.current_desc[new_row, new_col] = '.'
-            self.current_episode_treasures += 1 # Incrementar el contador
-        # Casillas '.', 'S' no dan recompensa (reward = 0)
+            # Increment counter
+            self.current_episode_treasures += 1
+        # Tiles '.', 'S' give no reward (reward = 0)
         
         return self.agent_state, reward, terminated, truncated, info
 
     def render(self):
         """
-        Renderiza el entorno VolcanoLake usando Pygame.
+        Renders the VolcanoLake environment using Pygame.
     
-        Comportamiento según el modo de renderizado:
-        - "human": Muestra la ventana gráfica en pantalla para visualización interactiva
-        - "rgb_array": Devuelve un array NumPy con los píxeles para grabación de video
-        - None: No renderiza nada (modo silencioso)
+        Behavior according to render mode:
+        - "human": Shows the graphic window on screen for interactive visualization
+        - "rgb_array": Returns a NumPy array with pixels for video recording
+        - None: Does not render anything (silent mode)
     
-        El renderizado incluye:
-        - Todas las casillas del mapa con sus colores correspondientes
-        - El agente representado como un rectángulo gris claro
+        The rendering includes:
+        - All map tiles with their corresponding colors
+        - The agent represented as a light grey rectangle
     
         Returns:
-        numpy.ndarray or None: Array de píxeles (alto, ancho, 3) si mode="rgb_array", 
-                              None en caso contrario
+        numpy.ndarray or None: Pixel array (height, width, 3) if mode="rgb_array", 
+                               None otherwise
         """
         if self.render_mode is None:
             return
         
         if self.window is None:
-            # Solo se inicializa si se llama a render() por primera vez
+            # Only initialized if render() is called for the first time
             pygame.init()
             pygame.display.set_caption("VolcanoLake_v3")
             
             if self.render_mode == "human":
-                # Creamos una ventana visible
+                # Create a visible window
                 self.window = pygame.display.set_mode((self.window_width, self.window_height))
             elif self.render_mode == "rgb_array":
-                # Creamos una superficie oculta 
+                # Create a hidden surface 
                 self.window = pygame.Surface((self.window_width, self.window_height))
             
         if self.clock is None:
             self.clock = pygame.time.Clock()
             
-        # --- Lógica de dibujado ---
+        # --- Drawing Logic ---
         
-        # Creamos un lienzo (Canvas) para dibujar
+        # Create a canvas for drawing
         canvas = pygame.Surface((self.window_width, self.window_height))
-        canvas.fill((255, 255, 255)) # Fondo blanco por si acaso
+        # White background just in case
+        canvas.fill((255, 255, 255))
 
-        # Dibujamos todas las casillas del mapa
+        # Draw all map tiles
         for r in range(self.nrows):
             for c in range(self.ncols):
                 tile_type = self.current_desc[r, c]
-                color = self.colors.get(tile_type, (0, 0, 0)) # Negro si hay error
+                # Black if error
+                color = self.colors.get(tile_type, (0, 0, 0))
                 
                 pygame.draw.rect(
                     canvas,
@@ -387,7 +432,7 @@ class VolcanoLakeEnv(gym.Env):
                     (c * self.cell_size, r * self.cell_size, self.cell_size, self.cell_size)
                 )
 
-        # Dibujamos al agente encima
+        # Draw the agent on top
         agent_row, agent_col = self._state_to_pos(self.agent_state)
         pygame.draw.rect(
             canvas,
@@ -395,23 +440,23 @@ class VolcanoLakeEnv(gym.Env):
             (agent_col * self.cell_size, agent_row * self.cell_size, self.cell_size, self.cell_size)
         )
 
-        # --- Lógica de salida ---
+        # --- Output Logic ---
         
         if self.render_mode == "human":
-            # Si es modo "human", copiamos el lienzo a la ventana
+            # If "human" mode, copy canvas to window
             self.window.blit(canvas, (0, 0))
             pygame.event.pump()
             pygame.display.update()
             
-            # Controlamos los FPS
+            # Control FPS
             self.clock.tick(self.metadata["render_fps"])
             
         elif self.render_mode == "rgb_array":
-            # Si es "rgb_array", copiamos el lienzo a la superficie oculta
+            # If "rgb_array", copy canvas to hidden surface
             self.window.blit(canvas, (0, 0))
             
-            # Devolvemos el contenido como un array NumPy
-            # Transponemos de (ancho, alto, 3) a (alto, ancho, 3)
+            # Return content as a NumPy array
+            # Transpose from (width, height, 3) to (height, width, 3)
             return np.transpose(
                 pygame.surfarray.array3d(self.window), (1, 0, 2)
             )
@@ -419,21 +464,22 @@ class VolcanoLakeEnv(gym.Env):
 
     def close(self):
         """
-        Limpia y cierra todos los recursos de Pygame.
+        Cleans and closes all Pygame resources.
     
-        Es importante llamar a esta función al final del entrenamiento o uso
-        para liberar memoria y evitar problemas con múltiples inicializaciones.
+        It is important to call this function at the end of training or usage
+        to free memory and avoid issues with multiple initializations.
     
-        Acciones realizadas:
-        - Cierra la ventana de Pygame (si existe)
-        - Cierra Pygame completamente
-        - Resetea las variables de ventana y reloj a None
+        Actions performed:
+        - Closes the Pygame window (if it exists)
+        - Closes Pygame completely
+        - Resets window and clock variables to None
         
-        Nota: Si no se llama, pueden quedar ventanas abiertas en segundo plano
-        consumiendo memoria y causando warnings en reinicios posteriores.
+        Note: If not called, windows may remain open in the background
+        consuming memory and causing warnings on subsequent restarts.
         """
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
-            self.window = None # Importante para reiniciar
+            # Important for reset
+            self.window = None
             self.clock = None
