@@ -1,3 +1,5 @@
+# Autores: Eduardo Estefanía Ovejero y Álvaro Martín García 
+
 import gymnasium as gym
 import numpy as np
 from tqdm import tqdm

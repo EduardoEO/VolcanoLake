@@ -3,40 +3,44 @@ from gymnasium import Wrapper, ObservationWrapper
 
 class IncreasingHoles(Wrapper):
     """
-    Wrapper que añade hoyos dinámicos al entorno durante el episodio.
-    Los hoyos aparecen con cierta probabilidad en cada paso, haciendo el entorno más desafiante.
+    Wrapper that adds dynamic holes to the environment during the episode.
+    Holes appear with a certain probability at each step, making the environment more challenging.
     """
     def __init__(self, env, lim_holes, prob_new_hole=0.05):
         """
-        Inicializa el wrapper de hoyos crecientes.
+        Initializes the increasing holes wrapper.
         
         Args:
-            env: Entorno base de Gymnasium
-            lim_holes: Número máximo de hoyos dinámicos permitidos
-            prob_new_hole: Probabilidad de crear un nuevo hoyo en cada paso (default: 0.05)
+            env: Base Gymnasium environment
+            lim_holes: Maximum number of dynamic holes allowed
+            prob_new_hole: Probability of creating a new hole at each step (default: 0.05)
         """
         super().__init__(env)
         self.prob_new_hole = prob_new_hole
         self.lim_holes = lim_holes
-        self.dynamic_holes = set() # Conjunto vacío
+        # Empty set
+        self.dynamic_holes = set() 
         
     def step(self, action):
         """
-        Ejecuta un paso en el entorno con la lógica de hoyos dinámicos.
+        Executes a step in the environment with the dynamic holes logic.
         
         Args:
-            action: Acción a ejecutar
+            action: Action to execute
             
         Returns:
-            Tupla (observación, recompensa, terminado, truncado, info)
+            Tuple (observation, reward, terminated, truncated, info)
         """
         obs, reward, terminated, truncated, info = self.env.step(action)
-        i, j = divmod(obs, self.env.unwrapped.desc.shape[1]) # Calcula la posición (fila, columna) del agente a partir del estado
+        # Calculates the agent's position (row, col) from the state
+        i, j = divmod(obs, self.env.unwrapped.desc.shape[1]) 
         if (i, j) in self.dynamic_holes:
-            terminated = True # Si el agente cae en un hoyo dinámico, termina el episodio
-            reward = 0 # Y la recompensa es 0
+            # If the agent falls into a dynamic hole, the episode ends
+            terminated = True 
+            # And the reward is 0
+            reward = 0 
     
-        # Con cierta probabilidad, añade un hoyo en una casilla aleatoria que no sea meta ni inicio
+        # With a certain probability, adds a hole in a random tile that is not goal or start
         if np.random.rand() < self.prob_new_hole:
             self._add_random_hole()
         
@@ -44,71 +48,79 @@ class IncreasingHoles(Wrapper):
 
     def _add_random_hole(self):
         """
-        Añade un hoyo dinámico en una posición aleatoria válida del mapa.
-        Solo se añade si no se ha alcanzado el límite máximo de hoyos.
+        Adds a dynamic hole in a valid random position on the map.
+        It is only added if the maximum limit of holes has not been reached.
         """
-        # Máximo de ciertos hoyos dinámicos, puede ser que le bloquees la salida al agente pero es parte del entrenamiento
+        # Maximum of certain dynamic holes, it might block the agent's exit but it's part of training
         if len(self.dynamic_holes) >= self.lim_holes:
             return
         
         desc = self.env.unwrapped.desc
-        valid_positions = [] # Posiciones en F
-        for i in range(desc.shape[0]): # Filas
-            for j in range(desc.shape[1]): # Columnas
+        # Positions in F (Frozen)
+        valid_positions = [] 
+        # Rows
+        for i in range(desc.shape[0]): 
+            # Columns
+            for j in range(desc.shape[1]): 
                 if desc[i, j] not in [b'S', b'G', b'H']:
                     valid_positions.append((i, j))
         if valid_positions:
             i, j = valid_positions[np.random.randint(len(valid_positions))]
-            desc[i, j] = b'H' # Convierte esa casilla en un hoyo
-            self.dynamic_holes.add((i, j)) # Añade el punto aleatorio válido al conjunto vacío
+            # Converts that tile into a hole
+            desc[i, j] = b'H' 
+            # Adds the valid random point to the set
+            self.dynamic_holes.add((i, j)) 
 
-class LimitedVisionRewardShaping(Wrapper): # Solo mira la casilla de la derecha, cambiando el self.direcction puedes el agente verá esa casilla y cambiará la recompensa al devolver step
+# Only looks at the right tile, changing self.direction allows the agent to see that tile and will change the reward when returning step
+class LimitedVisionRewardShaping(Wrapper): 
     """
-    Wrapper que proporciona visión limitada al agente y modifica las recompensas.
-    El agente puede ver solo la casilla actual y una casilla en dirección fija.
-    Penaliza suavemente cuando hay un hoyo delante.
+    Wrapper that provides limited vision to the agent and modifies rewards.
+    The agent can see only the current tile and one tile in a fixed direction.
+    Softly penalizes when there is a hole in front.
     """
     def __init__(self, env):
         """
-        Inicializa el wrapper de visión limitada con reward shaping.
+        Initializes the limited vision wrapper with reward shaping.
         
         Args:
-            env: Entorno base de Gymnasium
+            env: Base Gymnasium environment
         """
         super().__init__(env)
-        self.direction = 1  # 0=arriba, 1=derecha, 2=abajo, 3=izquierda
+        # 0=up, 1=right, 2=down, 3=left
+        self.direction = 1  
 
     def reset(self, **kwargs):
         """
-        Reinicia el entorno y añade información de visión al info.
+        Resets the environment and adds vision information to info.
         
         Returns:
-            Tupla (observación_original, info_con_visión)
+            Tuple (original_observation, info_with_vision)
         """
         obs, info = self.env.reset(**kwargs)
         info["vision"] = self._get_limited_obs(obs)
-        return obs, info  # obs sigue siendo un entero
+        # obs remains an integer
+        return obs, info  
 
     def step(self, action):
         """
-        Ejecuta un paso con reward shaping basado en la visión limitada.
+        Executes a step with reward shaping based on limited vision.
         
         Args:
-            action: Acción a ejecutar
+            action: Action to execute
             
         Returns:
-            Tupla (observación, recompensa_modificada, terminado, truncado, info)
+            Tuple (observation, modified_reward, terminated, truncated, info)
         """
         obs, reward, terminated, truncated, info = self.env.step(action)
 
-        # Obtener visión (pero NO cambiar la observación)
+        # Get vision (but DO NOT change the observation)
         vision = self._get_limited_obs(obs)
         info["vision"] = vision
 
-        # vision = [actual, delante]
+        # vision = [current, front]
         FRONT = vision[1]
 
-        # Si delante hay un agujero (H = 2), aplicar penalización suave
+        # If there is a hole in front (H = 2), apply soft penalty
         if FRONT == 2:
             reward -= 0.1
 
@@ -116,32 +128,37 @@ class LimitedVisionRewardShaping(Wrapper): # Solo mira la casilla de la derecha,
 
     def _get_limited_obs(self, obs):
         """
-        Calcula la observación de visión limitada del agente.
+        Calculates the agent's limited vision observation.
         
         Args:
-            obs: Observación original (posición como entero)
+            obs: Original observation (position as integer)
             
         Returns:
-            Array numpy con [casilla_actual_codificada, casilla_delante_codificada]
+            Numpy array with [encoded_current_tile, encoded_front_tile]
         """
         desc = self.env.unwrapped.desc
         ncols = desc.shape[1]
         i, j = divmod(obs, ncols)
-        current = desc[i, j] # pos actual
+        # current pos
+        current = desc[i, j] 
 
-        # Casilla enfrente según dirección que puede ver
-        if self.direction == 0: ni, nj = i-1, j # Casilla arriba
-        elif self.direction == 1: ni, nj = i, j+1 # Casilla derecha
-        elif self.direction == 2: ni, nj = i+1, j # Casilla abajo
-        else: ni, nj = i, j-1 # Casilla izquierda
+        # Tile in front according to the direction it can see
+        # Tile above
+        if self.direction == 0: ni, nj = i-1, j 
+        # Tile right
+        elif self.direction == 1: ni, nj = i, j+1 
+        # Tile below
+        elif self.direction == 2: ni, nj = i+1, j 
+        # Tile left
+        else: ni, nj = i, j-1 
 
-        # Si está fuera, se considera pared W
+        # If outside, considered wall W
         if not (0 <= ni < desc.shape[0] and 0 <= nj < desc.shape[1]):
             front = b'W'
         else:
             front = desc[ni, nj]
 
-        # Codificación S=0, F=1, H=2, G=3, W=4
+        # Encoding S=0, F=1, H=2, G=3, W=4
         def encode(cell):
             if cell == b'S': return 0
             if cell == b'F': return 1
@@ -151,91 +168,105 @@ class LimitedVisionRewardShaping(Wrapper): # Solo mira la casilla de la derecha,
 
         return np.array([encode(current), encode(front)])
 
-class LimitedVision(ObservationWrapper): # El agente ve delante dependiendo de la dirección interna (self.direction), que se actualiza según la acción anterior
+# The agent sees in front depending on internal direction (self.direction), which updates according to previous action
+class LimitedVision(ObservationWrapper): 
     """
-    Wrapper que proporciona visión limitada dinámica al agente.
-    La dirección de visión cambia según las acciones del agente.
-    Penaliza cuando hay un hoyo delante y mantiene el espacio de observación original.
+    Wrapper that provides dynamic limited vision to the agent.
+    The vision direction changes according to the agent's actions.
+    Penalizes when there is a hole in front and keeps the original observation space.
     """
     def __init__(self, env):
         """
-        Inicializa el wrapper de visión limitada dinámica.
+        Initializes the dynamic limited vision wrapper.
         
         Args:
-            env: Entorno base de Gymnasium
+            env: Base Gymnasium environment
         """
         super().__init__(env)
-        # 0=arriba, 1=derecha, 2=abajo, 3=izquierda
-        self.direction = 1 # Dirección inicial (mirando hacia la derecha por defecto)
+        # 0=up, 1=right, 2=down, 3=left
+        # Initial direction (looking right by default)
+        self.direction = 1 
 
-        # NO cambiamos observation_space, mantenemos obs original, sino estamos cambiando la Q-table y no podriamos usar el entorno predeterminado 4x4
+        # WE DO NOT change observation_space, we keep original obs, otherwise we are changing the Q-table and couldn't use the default 4x4 env
         self.observation_space = env.observation_space
 
     def reset(self, **kwargs):
         """
-        Reinicia el entorno y la dirección de visión.
+        Resets the environment and the vision direction.
         
         Returns:
-            Tupla (observación_original, info)
+            Tuple (original_observation, info)
         """
         obs, info = self.env.reset(**kwargs)
-        self.direction = 1  # Se resetea siempre mirando a la derecha
+        # Always resets looking to the right
+        self.direction = 1  
         return obs, info
 
     def step(self, action):
         """
-        Ejecuta un paso actualizando la dirección según la acción.
+        Executes a step updating the direction according to the action.
         
         Args:
-            action: Acción a ejecutar (0=LEFT, 1=DOWN, 2=RIGHT, 3=UP)
+            action: Action to execute (0=LEFT, 1=DOWN, 2=RIGHT, 3=UP)
             
         Returns:
-            Tupla (observación, recompensa_modificada, terminado, truncado, info)
+            Tuple (observation, modified_reward, terminated, truncated, info)
         """
         obs, reward, terminated, truncated, info = self.env.step(action)
 
-        # Obtiene visión (solo para info, NO sustituye obs)
+        # Gets vision (only for info, DOES NOT substitute obs)
         vision = self._get_limited_obs(obs)
-        info["vision"] = vision  # vision = [actual, delante]
+        # vision = [current, front]
+        info["vision"] = vision  
 
-        FRONT = vision[1]  # La casilla delante codificada
+        # The encoded front tile
+        FRONT = vision[1]  
 
-        # Si delante hay un hoyo (H == 2), penalizamos suavemente
+        # If there is a hole in front (H == 2), we penalize softly
         if FRONT == 2:
             reward -= 0.01
 
-        # Actualiza dirección según acción
+        # Updates direction according to action
         # 0=LEFT,1=DOWN,2=RIGHT,3=UP
-        if action == 3: self.direction = 0  # UP
-        elif action == 2: self.direction = 1  # RIGHT
-        elif action == 1: self.direction = 2  # DOWN
-        elif action == 0: self.direction = 3  # LEFT
+        # UP
+        if action == 3: self.direction = 0  
+        # RIGHT
+        elif action == 2: self.direction = 1  
+        # DOWN
+        elif action == 1: self.direction = 2  
+        # LEFT
+        elif action == 0: self.direction = 3  
 
         return obs, reward, terminated, truncated, info
 
     def _get_limited_obs(self, obs):
         """
-        Calcula la observación de visión limitada basada en la dirección actual.
+        Calculates the limited vision observation based on the current direction.
         
         Args:
-            obs: Observación original (posición como entero)
+            obs: Original observation (position as integer)
             
         Returns:
-            Array numpy con [casilla_actual_codificada, casilla_delante_codificada]
+            Numpy array with [encoded_current_tile, encoded_front_tile]
         """
         desc = self.env.unwrapped.desc
         nrows, ncols = desc.shape
         i, j = divmod(obs, ncols)
 
-        current = desc[i, j] # pos actual
+        # current pos
+        current = desc[i, j] 
 
-        # Calcula la casilla delante dado self.direction
-        if self.direction == 0: ni, nj = i-1, j # arriba
-        elif self.direction == 1: ni, nj = i, j+1 # derecha
-        elif self.direction == 2: ni, nj = i+1, j # abajo
-        else: ni, nj = i, j-1 # izquierda
+        # Calculates the front tile given self.direction
+        # up
+        if self.direction == 0: ni, nj = i-1, j 
+        # right
+        elif self.direction == 1: ni, nj = i, j+1 
+        # below
+        elif self.direction == 2: ni, nj = i+1, j 
+        # left
+        else: ni, nj = i, j-1 
 
-        # Si está fuera del mapa, cuenta como pared (W)
+        # If outside the map, counts as wall (W)
         if not (0 <= ni < nrows and 0 <= nj < ncols):
             front = b'W'
         else:

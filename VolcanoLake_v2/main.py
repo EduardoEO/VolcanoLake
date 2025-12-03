@@ -1,3 +1,5 @@
+# Autores: Eduardo Estefanía Ovejero y Álvaro Martín García 
+
 import gymnasium as gym
 import numpy as np
 from tqdm import tqdm
@@ -13,32 +15,34 @@ warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium.wrappe
 
 def train_volcanoLake_agent(n_episodes):
     """
-    Función principal para entrenar un agente Q-Learning en el entorno VolcanoLake.
+    Main function to train a Q-Learning agent in the VolcanoLake environment.
     
-    Configura el entorno con múltiples wrappers, inicializa el agente y ejecuta
-    el bucle de entrenamiento durante el número especificado de episodios.
+    Configures the environment with multiple wrappers, initializes the agent, and runs
+    the training loop for the specified number of episodes.
     
     Args:
-        n_episodes (int): Número total de episodios para el entrenamiento
+        n_episodes (int): Total number of episodes for training
         
     Returns:
-        tuple: (env, agent) - Entorno configurado y agente entrenado
+        tuple: (env, agent) - Configured environment and trained agent
     """
-    # ===== CONFIGURACIÓN DEL ENTORNO =====
-    # IMPORTANTE: El orden de los wrappers es crítico
-    # Los wrappers que modifican la mecánica del entorno van primero
-    # Los wrappers de observación y estadísticas van al final
+    # ===== ENVIRONMENT CONFIGURATION =====
+    # IMPORTANT: The order of wrappers is critical
+    # Wrappers that modify environment mechanics go first
+    # Observation and statistics wrappers go last
     
-    # Entorno base: FrozenLake sin deslizamiento
+    # Base environment: FrozenLake without slippage
     env = gym.make("FrozenLake-v1", is_slippery = False, render_mode = "rgb_array")
     
     # --- Wrappers ---
     env = IncreasingHoles(env, 2, 0.0001)
-    #env = LimitedVisionRewardShaping(env) # Verá solo la casilla de la derecha
-    env = LimitedVision(env) # Verá la casilla de enfrente según la acción anterior
+    # Previous version: Only saw the right cell
+    # env = LimitedVisionRewardShaping(env)
+    # Current version: Will see the cell in front according to previous action
+    env = LimitedVision(env)
     env = gym.wrappers.TimeLimit(env, 20)
     
-    # Crear carpeta videos en el directorio del script
+    # Create videos folder in the script directory
     video_folder = os.path.join(os.path.dirname(__file__), "videos")
     os.makedirs(video_folder, exist_ok=True)
     env = gym.wrappers.RecordVideo(
@@ -47,16 +51,16 @@ def train_volcanoLake_agent(n_episodes):
         episode_trigger = lambda ep: ep == n_episodes - 1
     )
     
-    # Registro de estadísticas (DEBE IR AL FINAL)
+    # Statistics recording (MUST BE AT THE END)
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=n_episodes)
 
-    # ===== CONFIGURACIÓN DE HIPERPARÁMETROS =====
+    # ===== HYPERPARAMETER CONFIGURATION =====
     learning_rate = 0.01
     start_epsilon = 1.0
     epsilon_decay = start_epsilon / (n_episodes / 2)
     final_epsilon = 0.1
 
-    # ===== INICIALIZACIÓN DEL AGENTE =====
+    # ===== AGENT INITIALIZATION =====
     agent = VolcanoLakeAgent(
         env=env,
         learning_rate=learning_rate,
@@ -65,39 +69,45 @@ def train_volcanoLake_agent(n_episodes):
         final_epsilon=final_epsilon,
     )
 
-    # ===== BUCLE DE ENTRENAMIENTO =====
+    # ===== TRAINING LOOP =====
     for _ in tqdm(range(n_episodes)):
-        # Reinicio del entrono después de cada episodio
+        # Reset the environment after each episode
         obs, info = env.reset()
         done = False
-        # Cada iteración equivale un paso del agente
+        # Each iteration equals one agent step
         while not done:
-            action = agent.get_action(env, obs) # Elige la acción según la política definida (epsilon-greedy)
-            next_obs, reward, terminated, truncated, info = env.step(action) # Ejecuta la acción "rellenando" las variables
-            agent.update(obs, action, reward, terminated, next_obs) # Actualiza la Q-table
-            obs = next_obs # Actualización del estado actual
-            done = terminated or truncated # Fin del episodio
-        agent.decay_epsilon() # Reducir el epsilon después de cada episodio
+            # Choose action according to defined policy (epsilon-greedy)
+            action = agent.get_action(env, obs) 
+            # Execute the action "filling" the variables
+            next_obs, reward, terminated, truncated, info = env.step(action) 
+            # Update the Q-table
+            agent.update(obs, action, reward, terminated, next_obs) 
+            # Update current state
+            obs = next_obs 
+            # End of episode
+            done = terminated or truncated 
+        # Reduce epsilon after each episode
+        agent.decay_epsilon() 
 
     return env, agent
 
 # ========================================
-# BLOQUE PRINCIPAL DE EJECUCIÓN
+# MAIN EXECUTION BLOCK
 # ========================================
 
 if __name__ == "__main__":
-    # ===== CONFIGURACIÓN DE EJECUCIÓN =====
+    # ===== EXECUTION CONFIGURATION =====
     plot_save = True
     n_episodes = 100_000
     
-    # ===== ENTRENAMIENTO DEL AGENTE =====
+    # ===== AGENT TRAINING =====
     env, agent = train_volcanoLake_agent(n_episodes)
     
-    # ===== GENERACIÓN DE GRÁFICAS DE ENTRENAMIENTO =====
+    # ===== GENERATING TRAINING PLOTS =====
     plot_training(env, agent, plot_save)
     
-    # ===== ANÁLISIS DE RESULTADOS =====
-    # Configuración para mostrar arrays de forma más legible
+    # ===== RESULTS ANALYSIS =====
+    # Configuration to display arrays more legibly
     np.set_printoptions(precision=2, suppress=True)
     print("\nQ-table final (filas=estados, columnas=acciones):")
     print(agent.q_values)
@@ -107,6 +117,10 @@ if __name__ == "__main__":
     print(best_actions)
     
     print("\nMapa final:")
-    print(env.unwrapped.desc)
+    # Decode bytes to strings for clean display
+    decoded_map = [[cell.decode('utf-8') for cell in row] for row in env.unwrapped.desc]
+    for row in decoded_map:
+        print(' '.join(row))
     
-    env.close() # Cerrar el entorno
+    # Close the environment
+    env.close()
