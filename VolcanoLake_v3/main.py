@@ -1,4 +1,4 @@
-# Autores: Eduardo Estefanía Ovejero y Álvaro Martín García
+# Authors: Eduardo Estefanía Ovejero & Álvaro Martín García
 
 import numpy as np
 import warnings

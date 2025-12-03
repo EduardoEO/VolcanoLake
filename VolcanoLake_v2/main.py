@@ -1,4 +1,4 @@
-# Autores: Eduardo Estefanía Ovejero y Álvaro Martín García 
+# Authors: Eduardo Estefanía Ovejero & Álvaro Martín García 
 
 import gymnasium as gym
 import numpy as np

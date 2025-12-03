@@ -1,4 +1,4 @@
-# Autores: Eduardo Estefanía Ovejero y Álvaro Martín García 
+# Authors: Eduardo Estefanía Ovejero & Álvaro Martín García 
 
 import gymnasium as gym
 import numpy as np
@@ -52,10 +52,10 @@ from utils import plot_training
 
 class VolcanoLakeAgent:
     """
-    Agente Q-Learning para el entorno VolcanoLake (FrozenLake modificado).
+    Q-Learning agent for the VolcanoLake environment (modified FrozenLake).
     
-    Implementa el algoritmo Q-Learning con política epsilon-greedy para
-    encontrar la política óptima de navegación en un lago congelado.
+    Implements the Q-Learning algorithm with epsilon-greedy policy to
+    find the optimal navigation policy in a frozen lake.
     """
     def __init__(
         self,
@@ -67,15 +67,15 @@ class VolcanoLakeAgent:
         discount_factor: float = 0.95,
     ):
         """
-        Inicializa el agente Q-Learning con sus hiperparámetros.
+        Initializes the Q-Learning agent with its hyperparameters.
         
         Args:
-            env: Entorno de Gymnasium
-            learning_rate (float): alfa - Tasa de aprendizaje (típicamente 0.01-0.1)
-            initial_epsilon (float): epsilon inicial - Exploración al inicio (típicamente 1.0)
-            epsilon_decay (float): Reducción de ε por episodio
-            final_epsilon (float): epsilon mínimo - Exploración residual (típicamente 0.1)
-            discount_factor (float): gamma - Descuento de recompensas futuras (default: 0.95)
+            env: Gymnasium environment
+            learning_rate (float): alpha - Learning rate (typically 0.01-0.1)
+            initial_epsilon (float): initial epsilon - Exploration at start (typically 1.0)
+            epsilon_decay (float): Reduction of epsilon per episode
+            final_epsilon (float): minimum epsilon - Residual exploration (typically 0.1)
+            discount_factor (float): gamma - Future reward discount (default: 0.95)
         """
         # Create the Q-table with states and actions (e.g., 16x4)
         self.q_values = np.zeros((env.observation_space.n, env.action_space.n))
@@ -88,18 +88,18 @@ class VolcanoLakeAgent:
     
     def get_action(self, env, obs: tuple[int, int, int]) -> int:
         """
-        Selecciona una acción usando la política epsilon-greedy.
+        Selects an action using the epsilon-greedy policy.
         
-        Estrategia de exploración vs explotación:
-        - Con probabilidad epsilon: acción aleatoria (EXPLORACIÓN)
-        - Con probabilidad (1-epsilon): mejor acción conocida (EXPLOTACIÓN)
+        Exploration vs exploitation strategy:
+        - With probability epsilon: random action (EXPLORATION)
+        - With probability (1-epsilon): best known action (EXPLOITATION)
         
         Args:
-            env: Entorno de Gymnasium (para muestrear acciones aleatorias)
-            obs (int): Estado actual del agente (posición en el grid)
+            env: Gymnasium environment (to sample random actions)
+            obs (int): Agent's current state (grid position)
             
         Returns:
-            int: Acción seleccionada (0=izquierda, 1=abajo, 2=derecha, 3=arriba)
+            int: Selected action (0=left, 1=down, 2=right, 3=up)
         """
         # If a random number is less than epsilon, choose a random action
         # (exploration). High epsilon => more exploration.
@@ -110,39 +110,39 @@ class VolcanoLakeAgent:
 
     def update(self, obs, action, reward, terminated, next_obs):
         """
-        Actualiza la Q-table usando la ecuación de Bellman.
+        Updates the Q-table using the Bellman equation.
         
-        Proceso de actualización:
-        1. Calcula el mejor valor futuro posible
-        2. Calcula el error TD (diferencia entre expectativa y realidad)
-        3. Ajusta el valor Q en proporción al error
+        Update process:
+        1. Calculates the best possible future value
+        2. Calculates the TD error (difference between expectation and reality)
+        3. Adjusts the Q value in proportion to the error
         
-        Ejemplo numérico:
+        Numeric example:
         ---------------
-        Situación:
-          - Estado actual: s=2
-          - Acción tomada: a=1 (abajo)
-          - Recompensa: r=1
-          - Siguiente estado: s'=3
-          - Q(2,1) actual = 0.5
+        Situation:
+          - Current state: s=2
+          - Action taken: a=1 (down)
+          - Reward: r=1
+          - Next state: s'=3
+          - Current Q(2,1) = 0.5
           - max_a' Q(3,a') = 0.8
           - lr = 0.1, gamma = 0.9
         
-        Cálculos:
+        Calculations:
           - future_q_value = 0.8
           - td_error = 1 + 0.9x0.8 - 0.5 = 1.22
-          - Nuevo Q(2,1) = 0.5 + 0.1x1.22 = 0.622
+          - New Q(2,1) = 0.5 + 0.1x1.22 = 0.622
         
-        Resultado:
-          La celda [2][1] aumenta de 0.5 → 0.622
-          El agente aprendió que esa acción es mejor de lo que pensaba
+        Result:
+          The cell [2][1] increases from 0.5 -> 0.622
+          The agent learned that action is better than thought
         
         Args:
-            obs (int): Estado actual
-            action (int): Acción tomada
-            reward (float): Recompensa recibida
-            terminated (bool): Si el episodio terminó
-            next_obs (int): Siguiente estado
+            obs (int): Current state
+            action (int): Action taken
+            reward (float): Reward received
+            terminated (bool): If the episode ended
+            next_obs (int): Next state
         """
         # ===== FUTURE VALUE CALCULATION =====
         # If the episode ended: future_q_value = 0 (no future)
@@ -171,22 +171,22 @@ class VolcanoLakeAgent:
 
     def decay_epsilon(self):
         """
-        Reduce epsilon linealmente para disminuir la exploración.
+        Linearly reduces epsilon to decrease exploration.
         
-        Se ejecuta al final de cada episodio. A medida que el agente
-        aprende, explora menos y explota más su conocimiento.
+        Executed at the end of each episode. As the agent learns,
+        it explores less and exploits its knowledge more.
         
-        Ejemplo de evolución típica:
-          Episodio 0:     epsilon = 1.0   (100% exploración)
-          Episodio 5000:  epsilon = 0.55  (55% exploración)
-          Episodio 10000: epsilon = 0.1   (10% exploración, se mantiene)
+        Typical evolution example:
+          Episode 0:     epsilon = 1.0   (100% exploration)
+          Episode 5000:  epsilon = 0.55  (55% exploration)
+          Episode 10000: epsilon = 0.1   (10% exploration, holds steady)
         """
         # Reduce epsilon but never below the minimum
         # Keeps a residual exploration chance to discover changes
         self.epsilon = max(self.final_epsilon, self.epsilon - self.epsilon_decay)
 
 # ========================================
-# FUNCIÓN DE ENTRENAMIENTO
+# TRAINING FUNCTION
 # ========================================
 
 class VolcanoLakeAgent:
@@ -407,10 +407,10 @@ if __name__ == "__main__":
     # ===== Q-TABLE ANALYSIS =====
     # Configuration to print arrays legibly
     np.set_printoptions(precision=2, suppress=True)
-    print("\nQ-table final (filas=estados, columnas=acciones):\n")
+    print("\nFinal Q-table (rows=states, columns=actions):\n")
     print(agent.q_values)
     
-    print("\nMejor acción por estado (0=izq, 1=abajo, 2=dcha, 3=arriba):")
+    print("\nBest action per state (0=left, 1=down, 2=right, 3=up):")
     best_actions = np.argmax(agent.q_values, axis=1).reshape(4, 4)    
     print(best_actions)
     
