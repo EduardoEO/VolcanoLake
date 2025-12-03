@@ -5,31 +5,31 @@ from tqdm import tqdm
 from utils import plot_training
 
 # ========================================
-# FUNDAMENTOS TEÓRICOS: Q-LEARNING
+# THEORETICAL FOUNDATIONS: Q-LEARNING
 # ========================================
 
-# Ecuación de Bellman para Q-learning:
-#   Q(s, a) <- Q(s, a) + alfa [r + gamma max_a' Q(s', a') - Q(s, a)]
+# Bellman equation for Q-learning:
+#   Q(s, a) <- Q(s, a) + alpha [r + gamma max_a' Q(s', a') - Q(s, a)]
 #
-# Componentes de la ecuación:
-#   - Q(s, a): Valor Q actual para el estado s y acción a
-#   - alfa (learning rate): Controla qué tan rápido aprende (0-1)
-#   - r (reward): Recompensa inmediata recibida
-#   - gamma (discount factor): Importancia de recompensas futuras (0-1)
-#   - max_a' Q(s', a'): Mejor valor Q posible en el siguiente estado
-#   - s: Estado actual (obs)
-#   - a: Acción tomada (action)
-#   - s': Siguiente estado (next_obs)
+# Components of the equation:
+#   - Q(s, a): Current Q-value for state s and action a
+#   - alpha (learning rate): Controls how fast the agent learns (0-1)
+#   - r (reward): Immediate reward received
+#   - gamma (discount factor): Importance of future rewards (0-1)
+#   - max_a' Q(s', a'): Best possible Q-value in the next state
+#   - s: Current state (obs)
+#   - a: Action taken (action)
+#   - s': Next state (next_obs)
 
-# Interpretación:
-#   El valor Q se ajusta según la diferencia entre lo que esperábamos
-#   y lo que realmente obtuvimos (TD error = temporal difference error)
+# Interpretation:
+#   The Q-value is adjusted according to the difference between what
+#   we expected and what we actually obtained (TD error = temporal difference error)
 
 # ========================================
-# ESTRUCTURA DE LA Q-TABLE
+# Q-TABLE STRUCTURE
 # ========================================
 
-# Ejemplo visual de Q-table para FrozenLake 4x4:
+# Visual example of a Q-table for FrozenLake 4x4:
 #
 #        LEFT   DOWN   RIGHT  UP
 #        (a0)   (a1)   (a2)   (a3)
@@ -39,13 +39,13 @@ from utils import plot_training
 # ...    ...    ...    ...    ...
 # s15    0.0    0.0    0.0    0.0
 #
-# Donde:
-#   - Filas (s0-s15): Los 16 estados del grid 4x4
-#   - Columnas (a0-a3): Las 4 acciones posibles
-#   - Valores: Recompensa esperada al tomar acción a en estado s
+# Where:
+#   - Rows (s0-s15): The 16 states of the 4x4 grid
+#   - Columns (a0-a3): The 4 possible actions
+#   - Values: Expected reward when taking action a in state s
 
 # ========================================
-# AGENTE Q-LEARNING
+# Q-LEARNING AGENT
 # ========================================
 
 class VolcanoLakeAgent:
@@ -75,7 +75,8 @@ class VolcanoLakeAgent:
             final_epsilon (float): epsilon mínimo - Exploración residual (típicamente 0.1)
             discount_factor (float): gamma - Descuento de recompensas futuras (default: 0.95)
         """
-        self.q_values = np.zeros((env.observation_space.n, env.action_space.n)) # Se crea la Q-table con los estados y las acciones, siendo 16x4.
+        # Create the Q-table with states and actions (e.g., 16x4)
+        self.q_values = np.zeros((env.observation_space.n, env.action_space.n))
         self.lr = learning_rate
         self.discount_factor = discount_factor
         self.epsilon = initial_epsilon
@@ -98,9 +99,12 @@ class VolcanoLakeAgent:
         Returns:
             int: Acción seleccionada (0=izquierda, 1=abajo, 2=derecha, 3=arriba)
         """
-        if np.random.random() < self.epsilon: # Si el número generado es menor que el epsilon genera un numero aleatorio 0-3 (las posibles acciones). Por lo tanto, si el epsilon es muy alto más probabilidad hay de explorar y viceversa
+        # If a random number is less than epsilon, choose a random action
+        # (exploration). High epsilon => more exploration.
+        if np.random.random() < self.epsilon:
             return env.action_space.sample()
-        return int(np.argmax(self.q_values[obs])) # Si no se cumple la condición se toma el valor de 0-3 que más alto esté en dicha observación de nuestra tabla-Q
+        # Otherwise choose the action with highest Q-value for the current observation
+        return int(np.argmax(self.q_values[obs]))
 
     def update(self, obs, action, reward, terminated, next_obs):
         """
@@ -138,29 +142,29 @@ class VolcanoLakeAgent:
             terminated (bool): Si el episodio terminó
             next_obs (int): Siguiente estado
         """
-        # ===== CÁLCULO DEL VALOR FUTURO =====
-        # Si el episodio terminó: future_q_value = 0 (no hay futuro)
-        # Si continúa: future_q_value = max_a' Q(s', a') (mejor valor posible en siguiente estado)
+        # ===== FUTURE VALUE CALCULATION =====
+        # If the episode ended: future_q_value = 0 (no future)
+        # If it continues: future_q_value = max_a' Q(s', a') (best possible value in next state)
         future_q_value = (not terminated) * np.max(self.q_values[next_obs])
         
-        # ===== PASO 2: CALCULAR ERROR TEMPORAL (TD ERROR) =====
-        # Mide cuánto nos equivocamos en nuestra predicción
-        # TD error = (Recompensa real + Valor futuro) - Predicción anterior
+        # ===== STEP 2: CALCULATE TEMPORAL DIFFERENCE (TD) ERROR =====
+        # Measures how wrong we were in our prediction
+        # TD error = (Actual reward + Future value) - Previous prediction
         td_error = reward + self.discount_factor * future_q_value - self.q_values[obs][action]
         
-        # Interpretación del TD error:
-        # - TD > 0: La acción fue MEJOR de lo esperado -< aumenta Q
-        # - TD < 0: La acción fue PEOR de lo esperado -> disminuye Q
-        # - TD ~= 0: La predicción fue CORRECTA -> cambio mínimo
+        # Interpretation of the TD error:
+        # - TD > 0: The action was BETTER than expected -> increases Q
+        # - TD < 0: The action was WORSE than expected -> decreases Q
+        # - TD ~= 0: The prediction was CORRECT -> minimal change
         
-        # ===== PASO 3: ACTUALIZAR Q-TABLE =====
-        # Solo modifica la celda Q(s,a) correspondiente
-        # Actualización proporcional al error: más error = más cambio
+        # ===== STEP 3: UPDATE Q-TABLE =====
+        # Only modify the corresponding Q(s,a) cell
+        # Update proportional to the error: larger error -> larger change
         self.q_values[obs][action] += self.lr * td_error
         
-        # ===== PASO 4: REGISTRAR ERROR PARA ANÁLISIS =====
-        # Guarda el TD error para monitorear el aprendizaje
-        # Un error decreciente indica que el agente está convergiendo
+        # ===== STEP 4: RECORD ERROR FOR ANALYSIS =====
+        # Save the TD error to monitor learning
+        # A decreasing error indicates the agent is converging
         self.training_error.append(td_error)
 
     def decay_epsilon(self):
@@ -175,44 +179,183 @@ class VolcanoLakeAgent:
           Episodio 5000:  epsilon = 0.55  (55% exploración)
           Episodio 10000: epsilon = 0.1   (10% exploración, se mantiene)
         """
-        # Reduce epsilon pero nunca por debajo del mínimo
-        # Mantiene exploración residual para descubrir cambios
+        # Reduce epsilon but never below the minimum
+        # Keeps a residual exploration chance to discover changes
         self.epsilon = max(self.final_epsilon, self.epsilon - self.epsilon_decay)
 
 # ========================================
 # FUNCIÓN DE ENTRENAMIENTO
 # ========================================
 
+class VolcanoLakeAgent:
+    """
+    Q-Learning agent for the VolcanoLake environment (modified FrozenLake).
+    
+    Implements the Q-Learning algorithm with epsilon-greedy policy to
+    find the optimal navigation policy in a frozen lake.
+    """
+    def __init__(
+        self,
+        env,
+        learning_rate: float,
+        initial_epsilon: float,
+        epsilon_decay: float,
+        final_epsilon: float,
+        discount_factor: float = 0.95,
+    ):
+        """
+        Initializes the Q-Learning agent with its hyperparameters.
+        
+        Args:
+            env: Gymnasium environment
+            learning_rate (float): alpha - Learning rate (typically 0.01-0.1)
+            initial_epsilon (float): initial epsilon - Exploration at start (typically 1.0)
+            epsilon_decay (float): Reduction of epsilon per episode
+            final_epsilon (float): minimum epsilon - Residual exploration (typically 0.1)
+            discount_factor (float): gamma - Future reward discount (default: 0.95)
+        """
+        # Create the Q-table with states and actions (e.g., 16x4)
+        self.q_values = np.zeros((env.observation_space.n, env.action_space.n))
+        self.lr = learning_rate
+        self.discount_factor = discount_factor
+        self.epsilon = initial_epsilon
+        self.epsilon_decay = epsilon_decay
+        self.final_epsilon = final_epsilon
+        self.training_error = []
+    
+    def get_action(self, env, obs: tuple[int, int, int]) -> int:
+        """
+        Selects an action using the epsilon-greedy policy.
+        
+        Exploration vs exploitation strategy:
+        - With probability epsilon: random action (EXPLORATION)
+        - With probability (1-epsilon): best known action (EXPLOITATION)
+        
+        Args:
+            env: Gymnasium environment (to sample random actions)
+            obs (int): Agent's current state (grid position)
+            
+        Returns:
+            int: Selected action (0=left, 1=down, 2=right, 3=up)
+        """
+        # If a random number is less than epsilon, choose a random action
+        # (exploration). High epsilon => more exploration.
+        if np.random.random() < self.epsilon:
+            return env.action_space.sample()
+        # Otherwise choose the action with highest Q-value for the current observation
+        return int(np.argmax(self.q_values[obs]))
+
+    def update(self, obs, action, reward, terminated, next_obs):
+        """
+        Updates the Q-table using the Bellman equation.
+        
+        Update process:
+        1. Calculates the best possible future value
+        2. Calculates the TD error (difference between expectation and reality)
+        3. Adjusts the Q value in proportion to the error
+        
+        Numeric example:
+        ---------------
+        Situation:
+          - Current state: s=2
+          - Action taken: a=1 (down)
+          - Reward: r=1
+          - Next state: s'=3
+          - Current Q(2,1) = 0.5
+          - max_a' Q(3,a') = 0.8
+          - lr = 0.1, gamma = 0.9
+        
+        Calculations:
+          - future_q_value = 0.8
+          - td_error = 1 + 0.9x0.8 - 0.5 = 1.22
+          - New Q(2,1) = 0.5 + 0.1x1.22 = 0.622
+        
+        Result:
+          The cell [2][1] increases from 0.5 -> 0.622
+          The agent learned that action is better than thought
+        
+        Args:
+            obs (int): Current state
+            action (int): Action taken
+            reward (float): Reward received
+            terminated (bool): If the episode ended
+            next_obs (int): Next state
+        """
+        # ===== FUTURE VALUE CALCULATION =====
+        # If the episode ended: future_q_value = 0 (no future)
+        # If it continues: future_q_value = max_a' Q(s', a') (best possible value in next state)
+        future_q_value = (not terminated) * np.max(self.q_values[next_obs])
+        
+        # ===== STEP 2: CALCULATE TEMPORAL DIFFERENCE (TD) ERROR =====
+        # Measures how wrong we were in our prediction
+        # TD error = (Actual reward + Future value) - Previous prediction
+        td_error = reward + self.discount_factor * future_q_value - self.q_values[obs][action]
+        
+        # Interpretation of the TD error:
+        # - TD > 0: The action was BETTER than expected -> increases Q
+        # - TD < 0: The action was WORSE than expected -> decreases Q
+        # - TD ~= 0: The prediction was CORRECT -> minimal change
+        
+        # ===== STEP 3: UPDATE Q-TABLE =====
+        # Only modify the corresponding Q(s,a) cell
+        # Update proportional to the error: larger error -> larger change
+        self.q_values[obs][action] += self.lr * td_error
+        
+        # ===== STEP 4: RECORD ERROR FOR ANALYSIS =====
+        # Save the TD error to monitor learning
+        # A decreasing error indicates the agent is converging
+        self.training_error.append(td_error)
+
+    def decay_epsilon(self):
+        """
+        Linearly reduces epsilon to decrease exploration.
+        
+        Executed at the end of each episode. As the agent learns,
+        it explores less and exploits its knowledge more.
+        
+        Typical evolution example:
+          Episode 0:     epsilon = 1.0  (100% exploration)
+          Episode 5000:  epsilon = 0.55 (55% exploration)
+          Episode 10000: epsilon = 0.1  (10% exploration, holds steady)
+        """
+        # Reduce epsilon but never below the minimum
+        # Keeps a residual exploration chance to discover changes
+        self.epsilon = max(self.final_epsilon, self.epsilon - self.epsilon_decay)
+
+# ========================================
+# TRAINING FUNCTION
+# ========================================
+
 def train_volcanoLake_agent(n_episodes):
     """
-    Entrena un agente Q-Learning en el entorno FrozenLake.
+    Trains a Q-Learning agent in the FrozenLake environment.
     
-    Configuración del entorno:
-    • FrozenLake-v1: Grid 4x4 con casillas deslizantes (is_slippery=True)
-    • Casillas deslizantes simulan hielo resbaladizo (realismo)
-    • Hace más difícil el aprendizaje pero más robusto
+    Environment configuration:
+    - FrozenLake-v1: 4x4 Grid with slippery tiles (is_slippery=True)
+    - Slippery tiles simulate slippery ice (realism)
+    - Makes learning harder but more robust
     
     Args:
-        n_episodes (int): Número de episodios de entrenamiento
+        n_episodes (int): Number of training episodes
         
     Returns:
-        tuple: (env, agent) - Entorno y agente entrenado
+        tuple: (env, agent) - Environment and trained agent
     """
-    # ===== CONFIGURACIÓN DEL ENTORNO =====
-    # Crea entorno FrozenLake predeterminado
+    # ===== ENVIRONMENT CONFIGURATION =====
+    # Creates default FrozenLake environment
     env = gym.make("FrozenLake-v1", is_slippery = True)
     
-    # Wrapper para registrar estadísticas por episodio
-    # Guarda recompensas acumuladas y duración de episodios
+    # Wrapper to record statistics per episode
+    # Saves accumulated rewards and episode durations
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=n_episodes)
 
-    # ===== CONFIGURACIÓN DE HIPERPARÁMETROS =====
+    # ===== HYPERPARAMETER CONFIGURATION =====
     learning_rate = 0.01
     start_epsilon = 1.0
     epsilon_decay = start_epsilon / (n_episodes / 2)
     final_epsilon = 0.1
 
-    # ===== INICIALIZACIÓN DEL AGENTE =====
+    # ===== AGENT INITIALIZATION =====
     agent = VolcanoLakeAgent(
         env=env,
         learning_rate=learning_rate,
@@ -221,39 +364,46 @@ def train_volcanoLake_agent(n_episodes):
         final_epsilon=final_epsilon,
     )
 
-    # ===== BUCLE DE ENTRENAMIENTO =====
-    # Itera por n_episodes con barra de progreso
+    # ===== TRAINING LOOP =====
+    # Iterates through n_episodes with progress bar
     for _ in tqdm(range(n_episodes)):
-        obs, info = env.reset() # Reinicio del entrono después de cada episodio
+        # Reset the environment after each episode
+        obs, _ = env.reset() 
         done = False
-        # Cada iteración equivale un paso del agente
+        # Each iteration is an agent step
         while not done:
-            action = agent.get_action(env, obs) # Elige la acción según la política definida (epsilon-greedy)
-            next_obs, reward, terminated, truncated, info = env.step(action) # Ejecuta la acción "rellenando" las variables
-            agent.update(obs, action, reward, terminated, next_obs) # Actualiza la Q-table
-            obs = next_obs # Actualización del estado actual
-            done = terminated or truncated # Fin del episodio
-        agent.decay_epsilon() # Reducir el epsilon después de cada episodio
+            # Choose action according to defined policy (epsilon-greedy)
+            action = agent.get_action(env, obs) 
+            # Executes the action "filling" the variables
+            next_obs, reward, terminated, truncated, _ = env.step(action) 
+            # Updates the Q-table
+            agent.update(obs, action, reward, terminated, next_obs) 
+            # Update current state
+            obs = next_obs 
+            # End of episode
+            done = terminated or truncated 
+        # Reduce epsilon after each episode
+        agent.decay_epsilon() 
 
     return env, agent
 
 # ========================================
-# BLOQUE PRINCIPAL DE EJECUCIÓN
+# MAIN EXECUTION BLOCK
 # ========================================
 
 if __name__ == "__main__":
-    # ===== CONFIGURACIÓN =====
+    # ===== CONFIGURATION =====
     plot_save = True
     n_episodes = 100_000
     
-    # ===== ENTRENAMIENTO =====
+    # ===== TRAINING =====
     env, agent = train_volcanoLake_agent(n_episodes)
     
-    # ===== VISUALIZACIÓN DE RESULTADOS =====
+    # ===== RESULTS VISUALIZATION =====
     plot_training(env, agent, plot_save)
     
-    # ===== ANÁLISIS DE LA Q-TABLE =====
-    # Configuración para imprimir arrays de forma legible
+    # ===== Q-TABLE ANALYSIS =====
+    # Configuration to print arrays legibly
     np.set_printoptions(precision=2, suppress=True)
     print("\nQ-table final (filas=estados, columnas=acciones):\n")
     print(agent.q_values)
@@ -262,4 +412,5 @@ if __name__ == "__main__":
     best_actions = np.argmax(agent.q_values, axis=1).reshape(4, 4)    
     print(best_actions)
     
-    env.close() # Cerrar el entorno
+    # Close the environment
+    env.close()
